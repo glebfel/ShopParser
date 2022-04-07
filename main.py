@@ -8,9 +8,14 @@ from selenium.common.exceptions import NoSuchElementException, NoSuchWindowExcep
 class OzonParser():
     MAIN_URL = "https://www.ozon.ru/"
 
+    def __init__(self):
+        options = webdriver.ChromeOptions()
+        options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        self.driver = webdriver.Chrome(options=options)
+
     def get_category_links(self):
         """
-        Get categories and their links for later parsing
+        Gets categories and their links for later parsing
         :return: list of category links
         """
         category_links = []
@@ -24,12 +29,12 @@ class OzonParser():
             print("Exception in 'get_category_links' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
 
-    # for "Автомобили и мототехника" only
-    def get_subcategory_links(self):
+    def get_subcategory_links(self, category_link):
         """
-        Get subcategory links in given category
+        Gets subcategory links in given category
         :return: list of subcategory links
         """
+        self.driver.get(category_link + "?sorting=rating")
         try:
             WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located((By.XPATH, "//a[@class='ry5']")))
@@ -42,7 +47,7 @@ class OzonParser():
 
     def get_page_items_links(self):
         """
-        Get all item's links in given page in the category (by link)
+        Gets all item's links in given page in the category (by link)
         :return: list of item's links in given page
         """
         try:
@@ -56,6 +61,7 @@ class OzonParser():
 
     def get_item_info(self, item_link):
         """
+        Gets info from description of an item
         :param item_link: given item's link
         :return: dict with parsed info of an item
         """
@@ -80,36 +86,26 @@ class OzonParser():
         except NoSuchElementException:
             print("Exception in 'get_item_info' method\nInternet connection is too slow! Please check it and rerun!")
 
-    def get_category_items(self, category_link):
+    def get_subcategory_items(self, subcategory_link):
         """
-        :param category_link: given category link
-        :return: list of dicts contains subcategories and items in it
+        Gets all items in given subcategory
+        :param subcategory_link: given subcategory link
+        :return: dict of name od subcategory and list of dicts contains items info
         """
-        category = []
         try:
-            self.driver.get(category_link)
-            # check if button "Смотреть все товары" is present
-            button = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='o1d d2o']//div[@class='ui-b1']")))
-            button.click()
-            # collect all links of categories
-            subcategories = self.get_subcategory_links()
-            for s in subcategories:
-                name = s.split("/")[4]
-                name = name.split("-")[0]
-                subcategory = []
-                self.driver.get(s)
-                next_button = None
-                # iterates through all pages while button "Дальше" available
-                next_button = WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
-                while next_button:
-                    links = self.get_page_items_links()
-                    for item in links:
-                        subcategory.append(self.get_item_info(item))
-                    next_button.click()
-                category.append({name: subcategory})
-            return category
+            name = subcategory_link.split("/")[4]
+            name = name.split("-")[0]
+            subcategory = []
+            self.driver.get(s)
+            # iterates through all pages while button "Дальше" available
+            next_button = WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
+            while next_button:
+                links = self.get_page_items_links()
+                for item in links:
+                    subcategory.append(self.get_item_info(item))
+                next_button.click()
+            return {name: subcategory}
         except NoSuchElementException:
             print("Exception in 'get_category_items' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
@@ -117,13 +113,14 @@ class OzonParser():
     # on "Автомобили и мототехника" category
     def test(self):
         try:
-            options = webdriver.ChromeOptions()
-            options.add_experimental_option("excludeSwitches", ["enable-logging"])
-            self.driver = webdriver.Chrome(options=options)
-            category_links = self.get_category_links()
-            items = self.get_category_items(category_links[28])
+            # collect all category links
+            cat_links = self.get_category_links()
+            # collect all subcategory links of "Автомобили и мототехника" category
+            sub_links = self.get_subcategory_links(cat_links[28])
+            for s in sub_links:
+                subcategory = self.get_subcategory_items(s)
             self.driver.quit()
-        except WebDriverException or NoSuchWindowException:
+        except WebDriverException or NoSuchWindowException or KeyboardInterrupt:
             print("The WebDriver window was closed! Please rerun the program!")
 
 

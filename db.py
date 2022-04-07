@@ -6,16 +6,19 @@ import psycopg2
 class WriteToDatabase():
     """Write JSON-file to database using PostgreSQL"""
 
-    def __init__(self, config_file: str):
+    def __init__(self, config_file):
         """
         Class constructor
+        :param config_file: string with config file location
         """
-        self.conf_info = self.read_config(config_file)
+        self.conf_info = WriteToDatabase.read_config(config_file)
 
-    def read_config(self, config_file: str) -> dict:
+    @staticmethod
+    def read_config(config_file):
         """
         Parses config file disposed in same folder as this script
-        and returns search url and database info.
+        and returns database info.
+        :param config_file: string with config file location
         """
         try:
             with open(config_file, 'r') as f:
@@ -23,16 +26,19 @@ class WriteToDatabase():
                 conf_info = {line.split(': ')[0]: line.split(': ')[1] for line in data if line != ''}
                 return conf_info
         except FileNotFoundError:
+            print("Config file is absent! Check your project folder!")
             return {}
 
-    def create_and_write_table(self, file_name: str):
+    def write_to_db(self, category):
         """
-        Creates table for input category and writes data
+        Creates schema 'Ozon' if not exists and table with collected data for given category
+        :param category: list of dicts contains subcategories and items in it
         """
-        base_connector = pymysql.connect(host=self.conf_info['host'],
-                                         database=self.conf_info['database'],
-                                         user=self.conf_info['login'],
-                                         password=self.conf_info['password'])
+        connection = psycopg2.connect(database=self.conf_info['database'],
+                                      user=self.conf_info['user'],
+                                      password=self.conf_info['password'],
+                                      host=self.conf_info['host'],
+                                      port=self.conf_info['port'])
         # Read JSON-file
         profi_data = []
         with open(file_name) as json_file:
@@ -52,14 +58,14 @@ class WriteToDatabase():
         # Create table and insert columns
         column_insert = " TEXT, ".join([f"`{column}`" for column in columns])
         query_text = f'create table `{table_name}` ({column_insert} TEXT)'
-        base_connector.cursor().execute(query_text)
+        connection.cursor().execute(query_text)
         # Insert every person
         for person in profi_data:
             person_columns = list(person.keys())
             person_column_insert = ", ".join([f"`{column}`" for column in person_columns])
             person_values = list(person.values())
-            person_values_insert = ", ".join([f"{base_connector.escape(value)}" for value in person_values])
+            person_values_insert = ", ".join([f"{connection.escape(value)}" for value in person_values])
             person_query = f"insert into `{table_name}` ({person_column_insert}) values ({person_values_insert})"
-            base_connector.cursor().execute(person_query)
-            base_connector.commit()
-        base_connector.cursor().close()
+            connection.cursor().execute(person_query)
+            connection.commit()
+        connection.cursor().close()
