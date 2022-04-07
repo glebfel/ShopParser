@@ -1,5 +1,3 @@
-import pymysql
-import json
 import psycopg2
 
 
@@ -39,33 +37,25 @@ class WriteToDatabase():
                                       password=self.conf_info['password'],
                                       host=self.conf_info['host'],
                                       port=self.conf_info['port'])
-        # Read JSON-file
-        profi_data = []
-        with open(file_name) as json_file:
-            profi_data = json.load(json_file)
-        # Check if profi_data is empty
-        if not profi_data:
-            return
-        # collect all columns
-        columns = list(profi_data[0].keys())
-        for profi in profi_data[1:]:
-            for key in profi.keys():
-                if (key not in columns):
-                    columns.append(key)
-        # Create table name
-        table_name = file_name.split('_')[3]
-        table_name = table_name.split('\\')[1]
-        # Create table and insert columns
-        column_insert = " TEXT, ".join([f"`{column}`" for column in columns])
-        query_text = f'create table `{table_name}` ({column_insert} TEXT)'
-        connection.cursor().execute(query_text)
-        # Insert every person
-        for person in profi_data:
-            person_columns = list(person.keys())
-            person_column_insert = ", ".join([f"`{column}`" for column in person_columns])
-            person_values = list(person.values())
-            person_values_insert = ", ".join([f"{connection.escape(value)}" for value in person_values])
-            person_query = f"insert into `{table_name}` ({person_column_insert}) values ({person_values_insert})"
-            connection.cursor().execute(person_query)
-            connection.commit()
-        connection.cursor().close()
+
+        connection.autocommit = True
+        # create schema "Ozon" if not exists
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS ozon")
+
+        # # Create table name
+        # name = category.keys()[0]
+        # # Create table and insert columns
+        # column_insert = " TEXT, ".join([f"`{column}`" for column in columns])
+        # query_text = f'create table `{table_name}` ({column_insert} TEXT)'
+        # connection.cursor().execute(query_text)
+        # # Insert every person
+        # for person in profi_data:
+        #     person_columns = list(person.keys())
+        #     person_column_insert = ", ".join([f"`{column}`" for column in person_columns])
+        #     person_values = list(person.values())
+        #     person_values_insert = ", ".join([f"{connection.escape(value)}" for value in person_values])
+        #     person_query = f"insert into `{table_name}` ({person_column_insert}) values ({person_values_insert})"
+        #     connection.cursor().execute(person_query)
+        #     connection.commit()
+        # connection.cursor().close()
