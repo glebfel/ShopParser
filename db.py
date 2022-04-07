@@ -2,14 +2,27 @@ import psycopg2
 
 
 class WriteToDatabase():
-    """Write JSON-file to database using PostgreSQL"""
+    """Write category to database using PostgreSQL"""
 
     def __init__(self, config_file):
         """
         Class constructor
         :param config_file: string with config file location
         """
-        self.conf_info = WriteToDatabase.read_config(config_file)
+        try:
+            self.conf_info = WriteToDatabase.read_config(config_file)
+            self.connection = psycopg2.connect(database=self.conf_info['database'],
+                                               user=self.conf_info['user'],
+                                               password=self.conf_info['password'],
+                                               host=self.conf_info['host'],
+                                               port=self.conf_info['port'])
+
+            # create schema "Ozon" if not exists
+            with self.connection.cursor() as cursor:
+                cursor.execute("CREATE SCHEMA IF NOT EXISTS ozon")
+                self.connection.commit()
+        except Exception as e:
+            print(e)
 
     @staticmethod
     def read_config(config_file):
@@ -29,33 +42,34 @@ class WriteToDatabase():
 
     def write_to_db(self, category):
         """
-        Creates schema 'Ozon' if not exists and table with collected data for given category
+        Creates table with collected data for given category
         :param category: list of dicts contains subcategories and items in it
         """
-        connection = psycopg2.connect(database=self.conf_info['database'],
-                                      user=self.conf_info['user'],
-                                      password=self.conf_info['password'],
-                                      host=self.conf_info['host'],
-                                      port=self.conf_info['port'])
+        try:
+            self.connection.autocommit = True
+            # create table
+            name = category[0]
+            columns = category[1][0]
+            start = f"CREATE TABLE IF NOT EXISTS ozon.{name} (ozon_id INT PRIMARY KEY"
+            end = ");"
+            for i in columns:
+                if i != "ozon_id":
+                    start += f", {i} CHARACTER VARYING(30)"
+            with self.connection.cursor() as cursor:
+                cursor.execute(start + end)
 
-        connection.autocommit = True
-        # create schema "Ozon" if not exists
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE SCHEMA IF NOT EXISTS ozon")
-
-        # # Create table name
-        # name = category.keys()[0]
-        # # Create table and insert columns
-        # column_insert = " TEXT, ".join([f"`{column}`" for column in columns])
-        # query_text = f'create table `{table_name}` ({column_insert} TEXT)'
-        # connection.cursor().execute(query_text)
-        # # Insert every person
-        # for person in profi_data:
-        #     person_columns = list(person.keys())
-        #     person_column_insert = ", ".join([f"`{column}`" for column in person_columns])
-        #     person_values = list(person.values())
-        #     person_values_insert = ", ".join([f"{connection.escape(value)}" for value in person_values])
-        #     person_query = f"insert into `{table_name}` ({person_column_insert}) values ({person_values_insert})"
-        #     connection.cursor().execute(person_query)
-        #     connection.commit()
-        # connection.cursor().close()
+            # insert values in table
+            insert_query = f"INSERT INTO ozon.{name} VALUES "
+            for row in category[1]:
+                insert_query += "("
+                for i in row.values():
+                    insert_query += f"'{i}',"
+                insert_query = insert_query[0:len(insert_query) - 1]
+                insert_query += "),"
+            insert_query = insert_query[0:len(insert_query) - 1]
+            with self.connection.cursor() as cursor:
+                cursor.execute(insert_query)
+        except Exception as e:
+            print(e)
+        finally:
+            self.connection.cursor().close()

@@ -3,10 +3,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException
+from db import WriteToDatabase
 
 
 class OzonParser():
     MAIN_URL = "https://www.ozon.ru/"
+    PATH = "config.conf"
 
     def __init__(self):
         options = webdriver.ChromeOptions()
@@ -32,6 +34,7 @@ class OzonParser():
     def get_subcategory_links(self, category_link):
         """
         Gets subcategory links in given category
+        :param category_link: given category link
         :return: list of subcategory links
         """
         self.driver.get(category_link + "?sorting=rating")
@@ -90,13 +93,13 @@ class OzonParser():
         """
         Gets all items in given subcategory
         :param subcategory_link: given subcategory link
-        :return: dict of name od subcategory and list of dicts contains items info
+        :return: list of name od subcategory and list of dicts contains items info
         """
         try:
             name = subcategory_link.split("/")[4]
             name = name.split("-")[0]
             subcategory = []
-            self.driver.get(s)
+            self.driver.get(subcategory_link)
             # iterates through all pages while button "Дальше" available
             next_button = WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
@@ -105,7 +108,7 @@ class OzonParser():
                 for item in links:
                     subcategory.append(self.get_item_info(item))
                 next_button.click()
-            return {name: subcategory}
+            return [name, subcategory]
         except NoSuchElementException:
             print("Exception in 'get_category_items' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
@@ -113,16 +116,21 @@ class OzonParser():
     # on "Автомобили и мототехника" category
     def test(self):
         try:
+            # initialize db module
+            db = WriteToDatabase(self.PATH)
             # collect all category links
             cat_links = self.get_category_links()
             # collect all subcategory links of "Автомобили и мототехника" category
             sub_links = self.get_subcategory_links(cat_links[28])
             for s in sub_links:
                 subcategory = self.get_subcategory_items(s)
-            self.driver.quit()
-        except WebDriverException or NoSuchWindowException or KeyboardInterrupt:
+                db.write_to_db(subcategory)
+        except WebDriverException or NoSuchWindowException:
             print("The WebDriver window was closed! Please rerun the program!")
+        # except BaseException as e:
+        #     print(e)
+        finally:
+            self.driver.quit()
 
 
-s = OzonParser()
-s.test()
+
