@@ -133,4 +133,8 @@ class OzonParser():
             self.driver.quit()
 
 
+if __name__ == '__main__':
+    auto = OzonParser()
+    auto.test()
+
 
