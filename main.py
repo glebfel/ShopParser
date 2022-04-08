@@ -48,23 +48,30 @@ class OzonParser():
             print("Exception in 'get_subcategory_links' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
 
-    def get_items_links(self):
+    def get_items_links(self, subcategory_link):
         """
         Gets all item's links in given page in the category (by link)
+        :param subcategory_link: given subcategory link
         :return: list of item's links in given page
         """
         try:
             links = []
             # iterates through all pages while button "Дальше" available
             next_button = True
+            self.driver.get(subcategory_link)
             while next_button:
-                next_button = WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
+                try:
+                    next_button = WebDriverWait(self.driver, 3).until(
+                        EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
+                except:
+                    next_button = False
+                    pass
                 WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.XPATH, "//a[@class='tile-hover-target i7l']")))
                 items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i7l']")
                 links.extend([_.get_attribute('href') for _ in items])
-                next_button.click()
+                if next_button:
+                    next_button.click()
             return links
         except NoSuchElementException:
             print("Exception in 'get_page_items_links' method\nInternet connection is too slow! Please check it and "
@@ -107,9 +114,8 @@ class OzonParser():
             name = subcategory_link.split("/")[4]
             name = name.split("-")[0]
             subcategory = []
-            self.driver.get(subcategory_link)
             # iterates through all pages while button "Дальше" available
-            links = self.get_items_links()
+            links = self.get_items_links(subcategory_link)
             for item in links:
                 subcategory.append(self.get_item_info(item))
             return [name, subcategory]
