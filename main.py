@@ -48,16 +48,24 @@ class OzonParser():
             print("Exception in 'get_subcategory_links' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
 
-    def get_page_items_links(self):
+    def get_items_links(self):
         """
         Gets all item's links in given page in the category (by link)
         :return: list of item's links in given page
         """
         try:
-            WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//a[@class='tile-hover-target i7l']")))
-            items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i7l']")
-            return [_.get_attribute('href') for _ in items]
+            links = []
+            # iterates through all pages while button "Дальше" available
+            next_button = True
+            while next_button:
+                next_button = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, "//a[@class='tile-hover-target i7l']")))
+                items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i7l']")
+                links.extend([_.get_attribute('href') for _ in items])
+                next_button.click()
+            return links
         except NoSuchElementException:
             print("Exception in 'get_page_items_links' method\nInternet connection is too slow! Please check it and "
                   "rerun!")
@@ -101,13 +109,9 @@ class OzonParser():
             subcategory = []
             self.driver.get(subcategory_link)
             # iterates through all pages while button "Дальше" available
-            next_button = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
-            while next_button:
-                links = self.get_page_items_links()
-                for item in links:
-                    subcategory.append(self.get_item_info(item))
-                next_button.click()
+            links = self.get_items_links()
+            for item in links:
+                subcategory.append(self.get_item_info(item))
             return [name, subcategory]
         except NoSuchElementException:
             print("Exception in 'get_category_items' method\nInternet connection is too slow! Please check it and "
@@ -115,22 +119,23 @@ class OzonParser():
 
     # on "Автомобили и мототехника" category
     def test(self):
-        try:
-            # initialize db module
-            db = WriteToDatabase(self.PATH)
-            # collect all category links
-            cat_links = self.get_category_links()
-            # collect all subcategory links of "Автомобили и мототехника" category
-            sub_links = self.get_subcategory_links(cat_links[28])
-            for s in sub_links:
-                subcategory = self.get_subcategory_items(s)
-                db.write_to_db(subcategory)
-        except WebDriverException or NoSuchWindowException:
-            print("The WebDriver window was closed! Please rerun the program!")
+        # try:
+        # initialize db module
+        db = WriteToDatabase(self.PATH)
+        # collect all category links
+        cat_links = self.get_category_links()
+        # collect all subcategory links of "Автомобили и мототехника" category
+        sub_links = self.get_subcategory_links(cat_links[28])
+        for s in sub_links:
+            subcategory = self.get_subcategory_items(s)
+            db.write_to_db(subcategory)
+        # except WebDriverException or NoSuchWindowException:
+        #     print("The WebDriver window was closed! Please rerun the program!")
         # except BaseException as e:
         #     print(e)
-        finally:
-            self.driver.quit()
+        # finally:
+        #     self.driver.quit()
+        self.driver.quit()
 
 
 if __name__ == '__main__':
