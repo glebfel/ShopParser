@@ -99,7 +99,19 @@ class OzonParser():
             ozon_id = item_link.split('/')
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
             ozon_id = ozon_id[len(ozon_id) - 1]
-            properties.update([("Описание", description), ("ozone_id", ozon_id)])
+
+            price = 0
+            try:
+                price = self.driver.find_element(By.XPATH, "//div[@class='r8j']").text
+                price = price.replace(" ", "").replace("₽", "")
+            except:
+                pass
+            try:
+                price = self.driver.find_element(By.XPATH, "//div[@class='k0w kw2 wk3']").text
+                price = price.replace(" ", "").replace("₽", "")
+            except:
+                pass
+            properties.update([("Описание", description), ("ozone_id", ozon_id), ("Цена", price)])
             return properties
         except NoSuchElementException:
             print("Exception in 'get_item_info' method\nInternet connection is too slow! Please check it and rerun!")
