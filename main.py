@@ -2,7 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException
+from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException, TimeoutException
 from db import WriteToDatabase
 
 
@@ -12,6 +12,7 @@ class OzonParser():
 
     def __init__(self):
         options = webdriver.ChromeOptions()
+        options.add_argument("--dns-prefetch-disable")
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
         self.driver = webdriver.Chrome(options=options)
 
@@ -23,13 +24,12 @@ class OzonParser():
         category_links = []
         try:
             self.driver.get(self.MAIN_URL)
-            self.driver.find_element(By.XPATH, "//div[@class='ce1']//button[@type='button']").click()
+            self.driver.find_element(By.XPATH, "//div[@class='c1e']").click()
             categories = self.driver.find_element(By.XPATH, "//div[@class='e1c']").find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories[0:31]]
             return category_links
-        except NoSuchElementException:
-            print("Exception in 'get_category_links' method\nInternet connection is too slow! Please check it and "
-                  "rerun!")
+        except NoSuchElementException as e:
+            print("Exception in 'get_category_links' method: \n" + e)
 
     def get_subcategory_links(self, category_link):
         """
@@ -40,13 +40,12 @@ class OzonParser():
         self.driver.get(category_link + "?sorting=rating")
         try:
             WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//a[@class='ry5']")))
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='ry5']")
+                EC.presence_of_element_located((By.XPATH, "//a[@class='r5y']")))
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='r5y']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
-        except NoSuchElementException:
-            print("Exception in 'get_subcategory_links' method\nInternet connection is too slow! Please check it and "
-                  "rerun!")
+        except NoSuchElementException as e:
+            print("Exception in 'get_subcategory_links' method: \n" + e)
 
     def get_items_links(self, subcategory_link):
         """
@@ -67,15 +66,14 @@ class OzonParser():
                     next_button = False
                     pass
                 WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, "//a[@class='tile-hover-target i7l']")))
-                items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i7l']")
+                    EC.presence_of_element_located((By.XPATH, "//a[@class='im5 i5m tile-hover-target']")))
+                items = self.driver.find_elements(By.XPATH, "//a[@class='im5 i5m tile-hover-target']")
                 links.extend([_.get_attribute('href') for _ in items])
                 if next_button:
                     next_button.click()
             return links
-        except NoSuchElementException:
-            print("Exception in 'get_page_items_links' method\nInternet connection is too slow! Please check it and "
-                  "rerun!")
+        except NoSuchElementException as e:
+            print("Exception in 'get_items_links' method: \n" + e)
 
     def get_item_info(self, item_link):
         """
@@ -86,35 +84,29 @@ class OzonParser():
         properties = {}
         self.driver.get(item_link)
         try:
-            WebDriverWait(self.driver, 5).until(
+            prop_str = WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "//div[@id='section-characteristics']//div//div[@class='s6j']")))
-            prop_str = self.driver.find_element(By.XPATH, "//div[@id='section-characteristics']//div//div["
-                                                          "@class='s6j']").text
+                    (By.XPATH, "(//div[@class='js7'])"))).text
             prop_str = prop_str.split("\n")
             for i in range(1, len(prop_str), 2):
                 properties.update({prop_str[i - 1]: prop_str[i]})
-            description = self.driver.find_element(By.XPATH,
-                                                   "//div[@id='section-description']//div//div//div[@class='kn']").text
+            description = WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[@id='section-description']//div//div//div[@class='nk']"))).text
+            description = description.replace("\"", "").replace("\'", "")
+            # extract ozon_id
             ozon_id = item_link.split('/')
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
             ozon_id = ozon_id[len(ozon_id) - 1]
-
-            price = 0
-            try:
-                price = self.driver.find_element(By.XPATH, "//div[@class='r8j']").text
-                price = price.replace(" ", "").replace("₽", "")
-            except:
-                pass
-            try:
-                price = self.driver.find_element(By.XPATH, "//div[@class='k0w kw2 wk3']").text
-                price = price.replace(" ", "").replace("₽", "")
-            except:
-                pass
-            properties.update([("Описание", description), ("ozone_id", ozon_id), ("Цена", price)])
+            # extract price
+            price = WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[@class='jr9']"))).text
+            price = price.replace(" ", "").replace("₽", "")
+            properties.update([("Описание", description), ("ozone_id", ozon_id), ("Цена", price), ("Ссылка", item_link)])
             return properties
-        except NoSuchElementException:
-            print("Exception in 'get_item_info' method\nInternet connection is too slow! Please check it and rerun!")
+        except NoSuchElementException as e:
+            print("Exception in 'get_item_info' method: \n" + e)
 
     def get_subcategory_items(self, subcategory_link):
         """
@@ -129,11 +121,13 @@ class OzonParser():
             # iterates through all pages while button "Дальше" available
             links = self.get_items_links(subcategory_link)
             for item in links:
-                subcategory.append(self.get_item_info(item))
+                try:
+                    subcategory.append(self.get_item_info(item))
+                except TimeoutException:
+                    continue
             return [name, subcategory]
-        except NoSuchElementException:
-            print("Exception in 'get_category_items' method\nInternet connection is too slow! Please check it and "
-                  "rerun!")
+        except NoSuchElementException as e:
+            print("Exception in 'get_subcategory_items' method: \n" + e)
 
     # on "Автомобили и мототехника" category
     def test(self):
@@ -154,6 +148,10 @@ class OzonParser():
         # finally:
         #     self.driver.quit()
         self.driver.quit()
+
+
+# db = WriteToDatabase(OzonParser.PATH)
+# db.write_to_db(['avtomobili', [{"ozon_id" : 123213, "Год выпуска" : 2001, "Пробег(км)": 23}]])
 
 
 if __name__ == '__main__':

@@ -49,12 +49,12 @@ class WriteToDatabase():
             self.connection.autocommit = True
             # create table
             name = category[0]
-            columns = category[1][0]
-            start = f"CREATE TABLE IF NOT EXISTS ozon.{name} (ozon_id INT PRIMARY KEY"
+            columns = list(category[1][0].keys())
+            start = f"CREATE TABLE IF NOT EXISTS ozon.{name} ("
             end = ");"
             for i in columns:
-                if i != "ozon_id":
-                    start += f", {i} CHARACTER VARYING(30)"
+                start += f'"{i}" TEXT,'
+            start = start[0:len(start) - 1]
             with self.connection.cursor() as cursor:
                 cursor.execute(start + end)
 
@@ -62,8 +62,17 @@ class WriteToDatabase():
             insert_query = f"INSERT INTO ozon.{name} VALUES "
             for row in category[1]:
                 insert_query += "("
-                for i in row.values():
-                    insert_query += f"'{i}',"
+                n_row = list(row.keys())
+                n_row_clean = [""]*14
+                for i in n_row:
+                    if i in columns:
+                        ind = columns.index(i)
+                        n_row_clean[ind] = i
+                for i in n_row_clean:
+                    if i == "":
+                        insert_query += f"' ',"
+                    else:
+                        insert_query += f"'{row[i]}',"
                 insert_query = insert_query[0:len(insert_query) - 1]
                 insert_query += "),"
             insert_query = insert_query[0:len(insert_query) - 1]
@@ -73,3 +82,6 @@ class WriteToDatabase():
             print(e)
         finally:
             self.connection.cursor().close()
+
+
+
