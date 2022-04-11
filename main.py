@@ -2,7 +2,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException, \
+    TimeoutException
 from db import WriteToDatabase
 
 
@@ -44,8 +45,16 @@ class OzonParser():
             categories = self.driver.find_elements(By.XPATH, "//a[@class='r5y']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
-        except NoSuchElementException as e:
-            print("Exception in 'get_subcategory_links' method: \n" + e)
+        except:
+            pass
+        try:
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//a[@class='r5y']")))
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='r5y']")
+            category_links = [category.get_attribute('href') for category in categories]
+            return category_links
+        except:
+            pass
 
     def get_items_links(self, subcategory_link):
         """
@@ -55,19 +64,26 @@ class OzonParser():
         """
         try:
             links = []
+            items = []
             # iterates through all pages while button "Дальше" available
             next_button = True
             self.driver.get(subcategory_link)
-            while next_button:
+            # take a restriction of 1200 for the number of products due to long time process
+            while next_button and len(links) < 1200:
                 try:
                     next_button = WebDriverWait(self.driver, 3).until(
-                        EC.presence_of_element_located((By.XPATH, "//div[@class='ui-b4 ui-c0']")))
+                        EC.presence_of_element_located((By.XPATH, "//div[@class='ui-d ui-d6']")))
                 except:
                     next_button = False
+                try:
+                    items = self.driver.find_elements(By.XPATH, "//a[@class='im5 i5m tile-hover-target']")
+                except:
                     pass
-                WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, "//a[@class='im5 i5m tile-hover-target']")))
-                items = self.driver.find_elements(By.XPATH, "//a[@class='im5 i5m tile-hover-target']")
+                try:
+                    if not items:
+                        items = self.driver.find_elements(By.XPATH, "//a[@class='im5 tile-hover-target']")
+                except:
+                    pass
                 links.extend([_.get_attribute('href') for _ in items])
                 if next_button:
                     next_button.click()
@@ -82,28 +98,50 @@ class OzonParser():
         :return: dict with parsed info of an item
         """
         properties = {}
+        description = ""
+        complectation = ""
         self.driver.get(item_link)
         try:
-            prop_str = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "(//div[@class='js7'])"))).text
-            prop_str = prop_str.split("\n")
-            for i in range(1, len(prop_str), 2):
+            prop_str = self.driver.find_elements(By.XPATH, "//div[@class='js7']")
+            text = ""
+            if len(prop_str) > 1:
+                for i in range(1, len(prop_str)):
+                    text += prop_str[i].text + "\n"
+            else:
+                text = prop_str[0].text
+            prop_str = text.split("\n")
+            for i in range(1, len(prop_str) - 1, 2):
                 properties.update({prop_str[i - 1]: prop_str[i]})
-            description = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[@id='section-description']//div//div//div[@class='nk']"))).text
+
+            WebDriverWait(self.driver, 3).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@id='section-description']//div//div[@class='nk']")))
+            description = self.driver.find_elements(By.XPATH, "//div[@id='section-description']//div//div[@class='nk']")
+            if len(description) > 1:
+                complectation = description[1].text
+                complectation = complectation.replace("\"", "").replace("\'", "").replace("Комплектация", "")
+            description = description[0].text
             description = description.replace("\"", "").replace("\'", "")
             # extract ozon_id
             ozon_id = item_link.split('/')
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
             ozon_id = ozon_id[len(ozon_id) - 1]
             # extract price
-            price = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[@class='jr9']"))).text
-            price = price.replace(" ", "").replace("₽", "")
-            properties.update([("Описание", description), ("ozone_id", ozon_id), ("Цена", price), ("Ссылка", item_link)])
+            try:
+                price = self.driver.find_element(By.XPATH, "//div[@class='jr9']").text
+            except:
+                pass
+            try:
+                price = self.driver.find_element(By.XPATH, "//span[@class='k1w wk1']").text
+            except:
+                pass
+            try:
+                price = self.driver.find_element(By.XPATH, "//div[@class='wk0 k2w w3k']").text
+            except:
+                pass
+            price = price.split("₽")[0]
+            price = price.replace(" ", "")
+            properties.update(
+                [("Описание", description), ("Комплектация", complectation),  ("ozone_id", ozon_id), ("Цена (руб.)", price), ("Ссылка", item_link)])
             return properties
         except NoSuchElementException as e:
             print("Exception in 'get_item_info' method: \n" + e)
@@ -116,7 +154,14 @@ class OzonParser():
         """
         try:
             name = subcategory_link.split("/")[4]
-            name = name.split("-")[0]
+            name = name.split("-")
+            if len(name) > 1:
+                n_name = ""
+                for i in range(len(name) - 1):
+                    n_name += name[i] + "_"
+                name = n_name[0:len(n_name) - 1]
+            else:
+                name = name[0]
             subcategory = []
             # iterates through all pages while button "Дальше" available
             links = self.get_items_links(subcategory_link)
@@ -130,7 +175,7 @@ class OzonParser():
             print("Exception in 'get_subcategory_items' method: \n" + e)
 
     # on "Автомобили и мототехника" category
-    def test(self):
+    def test_auto_category(self):
         # try:
         # initialize db module
         db = WriteToDatabase(self.PATH)
@@ -139,6 +184,8 @@ class OzonParser():
         # collect all subcategory links of "Автомобили и мототехника" category
         sub_links = self.get_subcategory_links(cat_links[28])
         for s in sub_links:
+            if s == "https://www.ozon.ru/category/mototsikly-34459/?sorting=rating" or s == "https://www.ozon.ru/category/avtomobili-34458/?sorting=rating":
+                continue
             subcategory = self.get_subcategory_items(s)
             db.write_to_db(subcategory)
         # except WebDriverException or NoSuchWindowException:
@@ -149,6 +196,17 @@ class OzonParser():
         #     self.driver.quit()
         self.driver.quit()
 
+    def test_stationery_category(self):
+        db = WriteToDatabase(self.PATH)
+        # collect all category links
+        cat_links = self.get_category_links()
+        # collect all subcategory links of "Автомобили и мототехника" category
+        sub_links = self.get_subcategory_links(cat_links[20])
+        for s in sub_links:
+            subcategory = self.get_subcategory_items(s)
+            db.write_to_db(subcategory)
+        self.driver.quit()
+
 
 # db = WriteToDatabase(OzonParser.PATH)
 # db.write_to_db(['avtomobili', [{"ozon_id" : 123213, "Год выпуска" : 2001, "Пробег(км)": 23}]])
@@ -156,6 +214,4 @@ class OzonParser():
 
 if __name__ == '__main__':
     auto = OzonParser()
-    auto.test()
-
-
+    auto.test_auto_category()

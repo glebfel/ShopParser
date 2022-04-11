@@ -63,11 +63,12 @@ class WriteToDatabase():
             for row in category[1]:
                 insert_query += "("
                 n_row = list(row.keys())
-                n_row_clean = [""]*14
+                n_row_clean = [""]*len(columns)
                 for i in n_row:
                     if i in columns:
                         ind = columns.index(i)
                         n_row_clean[ind] = i
+
                 for i in n_row_clean:
                     if i == "":
                         insert_query += f"' ',"
