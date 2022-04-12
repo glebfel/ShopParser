@@ -40,7 +40,7 @@ class OzonParser():
         """
         self.driver.get(category_link + "?sorting=rating")
         try:
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='r8y']")
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='rz7']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -59,7 +59,7 @@ class OzonParser():
             next_button = True
             self.driver.get(subcategory_link)
             # take a restriction of 1200 for the number of products due to long time process
-            while next_button and len(links) < 12:
+            while next_button and len(links) < 100:
                 try:
                     WebDriverWait(self.driver, 3).until(
                         EC.presence_of_element_located((By.XPATH, "//a[@class='ui-c3']")))
