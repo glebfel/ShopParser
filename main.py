@@ -86,7 +86,7 @@ class OzonParser():
         :return: dict with parsed info of an item
         """
         properties = {}
-        description = []
+        r_description = []
         complectation = ""
         self.driver.get(item_link)
         try:
@@ -177,7 +177,7 @@ class OzonParser():
     @staticmethod
     def add_parsed_category(link):
         with open(f"parsed_categories.txt", "a") as f:
-            f.write(link + "\n")
+            f.write(link)
 
     @staticmethod
     def check_if_parsed(link):
