@@ -1,13 +1,14 @@
+import json
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, WebDriverException, \
-    TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from db import WriteToDatabase
 
 
-class OzonParser():
+class OzonParser:
     MAIN_URL = "https://www.ozon.ru/"
     PATH = "config.conf"
 
@@ -22,7 +23,6 @@ class OzonParser():
         Gets categories and their links for later parsing
         :return: list of category links
         """
-        category_links = []
         try:
             self.driver.get(self.MAIN_URL)
             self.driver.find_element(By.XPATH, "//div[@class='c1e']").click()
@@ -59,7 +59,7 @@ class OzonParser():
             next_button = True
             self.driver.get(subcategory_link)
             # take a restriction of 1200 for the number of products due to long time process
-            while next_button and len(links) < 100:
+            while next_button and len(links) < 500:
                 try:
                     WebDriverWait(self.driver, 3).until(
                         EC.presence_of_element_located((By.XPATH, "//a[@class='ui-c3']")))
@@ -77,7 +77,7 @@ class OzonParser():
                     next_button[0].click()
             return links
         except NoSuchElementException as e:
-            print("Exception in 'get_items_links' method: \n" + e)
+            print(e)
 
     def get_item_info(self, item_link):
         """
@@ -95,15 +95,17 @@ class OzonParser():
             prop_str = self.driver.find_elements(By.XPATH, "//dl[@class='tj2']")
             text = ""
             for i in prop_str:
-               text += i.text + "\n"
+                text += i.text + "\n"
             prop_str = text.split("\n")
             prop_str = list(dict.fromkeys(prop_str))
             for i in range(1, len(prop_str) - 1, 2):
                 properties.update({prop_str[i - 1]: prop_str[i]})
             try:
                 WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@id='section-description']//div//div[@class='n1k']")))
-                r_description = self.driver.find_elements(By.XPATH, "//div[@id='section-description']//div//div[@class='n1k']")
+                    EC.presence_of_element_located(
+                        (By.XPATH, "//div[@id='section-description']//div//div[@class='n1k']")))
+                r_description = self.driver.find_elements(By.XPATH,
+                                                          "//div[@id='section-description']//div//div[@class='n1k']")
             except:
                 pass
             if len(r_description) == 0:
@@ -140,10 +142,11 @@ class OzonParser():
             price = price.split("₽")[0]
             price = price.replace(" ", "")
             properties.update(
-                [("Описание", description), ("Комплектация", complectation),  ("ozone_id", ozon_id), ("Цена (руб.)", price), ("Ссылка", item_link)])
+                [("Описание", description), ("Комплектация", complectation), ("ozone_id", ozon_id),
+                 ("Цена (руб.)", price), ("Ссылка", item_link)])
             return properties
         except NoSuchElementException as e:
-            print("Exception in 'get_item_info' method: \n" + e)
+            print(e)
 
     def get_subcategory_items(self, subcategory_link):
         """
@@ -167,17 +170,18 @@ class OzonParser():
             for item in links:
                 try:
                     subcategory.append(self.get_item_info(item))
-                except TimeoutException:
-                    continue
+                except Exception as e:
+                    self.driver.delete_all_cookies()
+                    print(subcategory_link + "\n" + e)
             return [name, subcategory]
         except NoSuchElementException as e:
-            print("Exception in 'get_subcategory_items' method: \n" + e)
+            print(e)
 
     # auxiliary methods for parsing process optimization
     @staticmethod
     def add_parsed_category(link):
         with open(f"parsed_categories.txt", "a") as f:
-            f.write(link)
+            f.write(link + "\n")
 
     @staticmethod
     def check_if_parsed(link):
@@ -187,39 +191,30 @@ class OzonParser():
             return True
         return False
 
-    # on "Автомобили и мототехника" category
-    def test_auto_category(self):
-        # try:
-        # initialize db module
-        db = WriteToDatabase(self.PATH)
-        # collect all category links
-        cat_links = self.get_category_links()
-        # collect all subcategory links of "Автомобили и мототехника" category
-        sub_links = self.get_subcategory_links(cat_links[28])
-        for s in sub_links:
-            if not self.check_if_parsed(s):
-                subcategory = self.get_subcategory_items(s)
-                db.write_to_db(subcategory)
-                self.add_parsed_category(s)
-        # except WebDriverException or NoSuchWindowException:
-        #     print("The WebDriver window was closed! Please rerun the program!")
-        # except BaseException as e:
-        #     print(e)
-        # finally:
-        #     self.driver.quit()
-        self.driver.quit()
+    @staticmethod
+    def json_backup(category):
+        """
+        Prepares backup for parsed data
+        """
+        if not os.path.isdir("json_backup"):
+            os.mkdir("json_backup")
+        with open(f"json_backup/{category[0]}.json", "w") as write_file:
+            json.dump(category, write_file)
 
     def test_products_category(self):
-        db = WriteToDatabase(self.PATH)
         sub_links = self.get_subcategory_links("https://www.ozon.ru/category/produkty-pitaniya-9200/?sorting=rating")
         for s in sub_links:
             if not self.check_if_parsed(s):
                 subcategory = self.get_subcategory_items(s)
-                db.write_to_db(subcategory)
+                self.json_backup(subcategory)
+                WriteToDatabase.write_to_db(self.PATH, subcategory)
                 self.add_parsed_category(s)
         self.driver.quit()
 
 
 if __name__ == '__main__':
     auto = OzonParser()
+    # with open("json_backup/konditerskie_izdeliya.json") as json_file:
+    #     data = json.load(json_file)
+    # WriteToDatabase.write_from_json(self.PATH, data)
     auto.test_products_category()
