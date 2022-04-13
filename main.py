@@ -4,7 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, NoSuchWindowException, StaleElementReferenceException
 from db import WriteToDatabase
 
 
@@ -14,9 +14,17 @@ class OzonParser:
 
     def __init__(self):
         options = webdriver.ChromeOptions()
+        options.page_load_strategy = 'eager'
+        options.add_argument("start-maximized")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-browser-side-navigation")
+        options.add_argument("--disable-gpu")
         options.add_argument("--dns-prefetch-disable")
+        options.add_argument("--incognito")
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
         self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(20)
 
     def get_category_links(self):
         """
@@ -25,8 +33,8 @@ class OzonParser:
         """
         try:
             self.driver.get(self.MAIN_URL)
-            self.driver.find_element(By.XPATH, "//div[@class='c1e']").click()
-            categories = self.driver.find_element(By.XPATH, "//div[@class='e1c']").find_elements(By.TAG_NAME, "a")
+            self.driver.find_element(By.XPATH, "//div[@class='ec2']").click()
+            categories = self.driver.find_element(By.XPATH, "//div[@class='c3e']").find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories[0:31]]
             return category_links
         except NoSuchElementException as e:
@@ -40,7 +48,7 @@ class OzonParser:
         """
         self.driver.get(category_link + "?sorting=rating")
         try:
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='rz7']")
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='r8z']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -52,32 +60,29 @@ class OzonParser:
         :param subcategory_link: given subcategory link
         :return: list of item's links in given page
         """
-        try:
-            links = []
-            items = []
-            # iterates through all pages while button "Дальше" available
-            next_button = True
-            self.driver.get(subcategory_link)
-            # take a restriction of 1200 for the number of products due to long time process
-            while next_button and len(links) < 500:
-                try:
-                    WebDriverWait(self.driver, 3).until(
-                        EC.presence_of_element_located((By.XPATH, "//a[@class='ui-c3']")))
-                    next_button = self.driver.find_elements(By.XPATH, "//a[@class='ui-c3']")
-                    if len(next_button) > 1:
-                        next_button = self.driver.find_elements(By.XPATH, "(//a[@class='ui-c3'])[2]")
-                except:
-                    next_button = False
-                try:
-                    items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target li9']")
-                except:
-                    pass
-                links.extend([_.get_attribute('href') for _ in items])
-                if next_button:
-                    next_button[0].click()
-            return links
-        except NoSuchElementException as e:
-            print(e)
+        links = []
+        items = True
+        next_button = True
+        # iterates through all pages while button "Дальше" available
+        self.driver.get(subcategory_link)
+        # take a restriction of 500 for the number of products due to long time process
+        while next_button and items and len(links) < 300:
+            try:
+                next_button = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
+                if len(next_button) > 1:
+                    next_button = next_button[1]
+                else:
+                    next_button = next_button[0]
+                # only for products category - //a[@class='tile-hover-target li9']
+                items = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='i8m tile-hover-target']")))
+            except:
+                break
+            links.extend([_.get_attribute('href') for _ in items])
+            if next_button:
+                next_button.click()
+        return links
 
     def get_item_info(self, item_link):
         """
@@ -90,9 +95,8 @@ class OzonParser:
         complectation = ""
         self.driver.get(item_link)
         try:
-            WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, "//dl[@class='tj2']")))
-            prop_str = self.driver.find_elements(By.XPATH, "//dl[@class='tj2']")
+            prop_str = WebDriverWait(self.driver, 3).until(
+                EC.presence_of_all_elements_located((By.XPATH, "//dl[@class='t3j']")))
             text = ""
             for i in prop_str:
                 text += i.text + "\n"
@@ -101,11 +105,8 @@ class OzonParser:
             for i in range(1, len(prop_str) - 1, 2):
                 properties.update({prop_str[i - 1]: prop_str[i]})
             try:
-                WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_element_located(
-                        (By.XPATH, "//div[@id='section-description']//div//div[@class='n1k']")))
-                r_description = self.driver.find_elements(By.XPATH,
-                                                          "//div[@id='section-description']//div//div[@class='n1k']")
+                r_description = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn3']")))
             except:
                 pass
             if len(r_description) == 0:
@@ -123,20 +124,21 @@ class OzonParser:
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
             ozon_id = ozon_id[len(ozon_id) - 1]
             # extract price
+            price = ""
             try:
-                price = self.driver.find_element(By.XPATH, "//div[@class='sj0']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk4 w4k']").text
             except:
                 pass
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='k3w wk3']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk4']").text
             except:
                 pass
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='k3w']").text
+                price = self.driver.find_element(By.XPATH, "//div[@class='s1j']").text
             except:
                 pass
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='k3w w3k']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk4 kw5']").text
             except:
                 pass
             price = price.split("₽")[0]
@@ -154,28 +156,27 @@ class OzonParser:
         :param subcategory_link: given subcategory link
         :return: list of name od subcategory and list of dicts contains items info
         """
-        try:
-            name = subcategory_link.split("/")[4]
-            name = name.split("-")
-            if len(name) > 1:
-                n_name = ""
-                for i in range(len(name) - 1):
-                    n_name += name[i] + "_"
-                name = n_name[0:len(n_name) - 1]
-            else:
-                name = name[0]
-            subcategory = []
-            # iterates through all pages while button "Дальше" available
-            links = self.get_items_links(subcategory_link)
-            for item in links:
-                try:
-                    subcategory.append(self.get_item_info(item))
-                except Exception as e:
-                    self.driver.delete_all_cookies()
-                    print(subcategory_link + "\n" + e)
-            return [name, subcategory]
-        except NoSuchElementException as e:
-            print(e)
+        name = subcategory_link.split("/")[4]
+        name = name.split("-")
+        if len(name) > 1:
+            n_name = ""
+            for i in range(len(name) - 1):
+                n_name += name[i] + "_"
+            name = n_name[0:len(n_name) - 1]
+        else:
+            name = name[0]
+        subcategory = []
+        # iterates through all pages while button "Дальше" available
+        links = self.get_items_links(subcategory_link)
+        for item in links:
+            try:
+                subcategory.append(self.get_item_info(item))
+            except (TimeoutException,StaleElementReferenceException) as t:
+                print(t)
+            except NoSuchWindowException as n:
+                print(n)
+                return
+        return [name, subcategory]
 
     # auxiliary methods for parsing process optimization
     @staticmethod
