@@ -4,7 +4,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, NoSuchWindowException, StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, NoSuchWindowException, \
+    StaleElementReferenceException, WebDriverException
 from db import WriteToDatabase
 
 
@@ -66,7 +67,7 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(subcategory_link)
         # take a restriction of 500 for the number of products due to long time process
-        while next_button and items and len(links) < 300:
+        while next_button and items and len(links) < 40:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
@@ -96,14 +97,14 @@ class OzonParser:
         self.driver.get(item_link)
         try:
             prop_str = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//dl[@class='t3j']")))
+                EC.presence_of_element_located((By.XPATH, "//div[@id='section-characteristics']")))
+            prop_str = prop_str.find_elements(By.TAG_NAME, "dl")
             text = ""
             for i in prop_str:
                 text += i.text + "\n"
-            prop_str = text.split("\n")
-            prop_str = list(dict.fromkeys(prop_str))
-            for i in range(1, len(prop_str) - 1, 2):
-                properties.update({prop_str[i - 1]: prop_str[i]})
+            prop_str = text.replace(":", "\n").split("\n")
+            for i in range(0, len(prop_str) - 1, 2):
+                properties.update({prop_str[i]: prop_str[i + 1]})
             try:
                 r_description = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn3']")))
@@ -171,7 +172,7 @@ class OzonParser:
         for item in links:
             try:
                 subcategory.append(self.get_item_info(item))
-            except (TimeoutException,StaleElementReferenceException) as t:
+            except (TimeoutException,StaleElementReferenceException, WebDriverException) as t:
                 print(t)
             except NoSuchWindowException as n:
                 print(n)
@@ -187,8 +188,8 @@ class OzonParser:
     @staticmethod
     def check_if_parsed(link):
         with open(f"parsed_categories.txt", "r") as f:
-            text = f.read()
-        if link in text:
+            s_text = f.read()
+        if link in s_text:
             return True
         return False
 
@@ -215,6 +216,7 @@ class OzonParser:
 
 if __name__ == '__main__':
     auto = OzonParser()
+    auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
     # with open("json_backup/konditerskie_izdeliya.json") as json_file:
     #     data = json.load(json_file)
     # WriteToDatabase.write_from_json(self.PATH, data)
