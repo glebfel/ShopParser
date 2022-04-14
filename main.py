@@ -49,7 +49,7 @@ class OzonParser:
         """
         self.driver.get(category_link + "?sorting=rating")
         try:
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='r8z']")
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='s2s']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -77,7 +77,7 @@ class OzonParser:
                     next_button = next_button[0]
                 # only for products category - //a[@class='tile-hover-target li9']
                 items = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='i8m tile-hover-target']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='n0i tile-hover-target']")))
             except:
                 break
             links.extend([_.get_attribute('href') for _ in items])
@@ -93,7 +93,6 @@ class OzonParser:
         """
         properties = {}
         r_description = []
-        complectation = ""
         self.driver.get(item_link)
         try:
             prop_str = WebDriverWait(self.driver, 3).until(
@@ -107,7 +106,7 @@ class OzonParser:
                 properties.update({prop_str[i]: prop_str[i + 1]})
             try:
                 r_description = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn3']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn6']")))
             except:
                 pass
             if len(r_description) == 0:
@@ -118,8 +117,11 @@ class OzonParser:
             elif len(r_description) == 2:
                 description = r_description[0].text
                 description = description.replace("\"", "").replace("\'", "")
-                complectation = r_description[1].text
-                complectation = complectation.replace("\"", "").replace("\'", "").replace("Комплектация", "")
+                headers = r_description[1].find_elements(By.TAG_NAME, "h3")
+                desc = r_description[1].find_elements(By.TAG_NAME, "p")
+                if len(headers) == len(desc):
+                    for i in range(len(headers)):
+                        properties.update({headers[i].text : desc[i].text})
             # extract ozon_id
             ozon_id = item_link.split('/')
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
@@ -127,25 +129,17 @@ class OzonParser:
             # extract price
             price = ""
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='wk4 w4k']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk7 w7k']").text
             except:
                 pass
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='wk4']").text
-            except:
-                pass
-            try:
-                price = self.driver.find_element(By.XPATH, "//div[@class='s1j']").text
-            except:
-                pass
-            try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='wk4 kw5']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk7']").text
             except:
                 pass
             price = price.split("₽")[0]
             price = price.replace(" ", "")
             properties.update(
-                [("Описание", description), ("Комплектация", complectation), ("ozone_id", ozon_id),
+                [("Описание", description), ("ozone_id", ozon_id),
                  ("Цена (руб.)", price), ("Ссылка", item_link)])
             return properties
         except NoSuchElementException as e:
