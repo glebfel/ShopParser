@@ -25,7 +25,7 @@ class OzonParser:
         options.add_argument("--incognito")
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
         self.driver = webdriver.Chrome(options=options)
-        self.driver.set_page_load_timeout(20)
+        self.driver.set_page_load_timeout(15)
 
     def get_category_links(self):
         """
@@ -173,6 +173,7 @@ class OzonParser:
             try:
                 subcategory.append(self.get_item_info(item))
             except (TimeoutException,StaleElementReferenceException, WebDriverException) as t:
+                print(item)
                 print(t)
             except NoSuchWindowException as n:
                 print(n)
@@ -216,7 +217,7 @@ class OzonParser:
 
 if __name__ == '__main__':
     auto = OzonParser()
-    auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
+    #auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
     # with open("json_backup/konditerskie_izdeliya.json") as json_file:
     #     data = json.load(json_file)
     # WriteToDatabase.write_from_json(self.PATH, data)
