@@ -42,6 +42,14 @@ class WriteToDatabase:
                 cursor.execute("CREATE SCHEMA IF NOT EXISTS ozon")
                 connection.commit()
             connection.autocommit = True
+            # create table with categories
+            name = category[0]
+            c_query = f'CREATE TABLE IF NOT EXISTS ozon.{name} ("Категория" TEXT,"Количество товара" TEXT, "ссылка" TEXT");'
+            # insert category in categories table
+            i_query = f"INSERT INTO ozon.{name} VALUES '{name}','{len(category[1])}', '{category[2]}' ;"
+            with connection.cursor() as cursor:
+                cursor.execute(c_query)
+                cursor.execute(i_query)
             # create table
             name = category[0]
             columns = list(category[1][0].keys())

@@ -34,8 +34,8 @@ class OzonParser:
         """
         try:
             self.driver.get(self.MAIN_URL)
-            self.driver.find_element(By.XPATH, "//div[@class='ec2']").click()
-            categories = self.driver.find_element(By.XPATH, "//div[@class='c3e']").find_elements(By.TAG_NAME, "a")
+            self.driver.find_element(By.XPATH, "//div[@class='ec5']").click()
+            categories = self.driver.find_element(By.XPATH, "//div[@class='c6e']").find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories[0:31]]
             return category_links
         except NoSuchElementException as e:
@@ -67,7 +67,7 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(subcategory_link)
         # take a restriction of 500 for the number of products due to long time process
-        while next_button and items and len(links) < 40:
+        while next_button and items and len(links) < 600:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
@@ -172,7 +172,7 @@ class OzonParser:
             except NoSuchWindowException as n:
                 print(n)
                 return
-        return [name, subcategory]
+        return [name, subcategory, subcategory_link]
 
     # auxiliary methods for parsing process optimization
     @staticmethod
