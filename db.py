@@ -44,9 +44,9 @@ class WriteToDatabase:
             connection.autocommit = True
             # create table with categories
             name = category[0]
-            c_query = f'CREATE TABLE IF NOT EXISTS ozon.{name} ("Категория" TEXT,"Количество товара" TEXT, "ссылка" TEXT");'
+            c_query = f'CREATE TABLE IF NOT EXISTS ozon.{name} ("Категория" TEXT,"Количество товара" TEXT, "Ссылка" TEXT");'
             # insert category in categories table
-            i_query = f"INSERT INTO ozon.{name} VALUES '{name}','{len(category[1])}', '{category[2]}' ;"
+            i_query = f"INSERT INTO ozon.{name} VALUES ('{name}','{len(category[1])}', '{category[2]}');"
             with connection.cursor() as cursor:
                 cursor.execute(c_query)
                 cursor.execute(i_query)
