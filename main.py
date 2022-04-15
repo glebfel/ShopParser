@@ -49,7 +49,7 @@ class OzonParser:
         """
         self.driver.get(category_link + "?sorting=rating")
         try:
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='s2s']")
+            categories = self.driver.find_elements(By.XPATH, "//a[@class='s6s']")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -64,9 +64,10 @@ class OzonParser:
         links = []
         items = True
         next_button = True
+        first_time = False
         # iterates through all pages while button "Дальше" available
         self.driver.get(subcategory_link)
-        # take a restriction of 500 for the number of products due to long time process
+        # take a restriction of 600 for the number of products due to long time process
         while next_button and items and len(links) < 600:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
@@ -74,10 +75,13 @@ class OzonParser:
                 if len(next_button) > 1:
                     next_button = next_button[1]
                 else:
+                    if self.driver.current_url == subcategory_link and first_time:
+                        break
                     next_button = next_button[0]
+                first_time = True
                 # only for products category - //a[@class='tile-hover-target li9']
                 items = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='n0i tile-hover-target']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='n2i tile-hover-target']")))
             except:
                 break
             links.extend([_.get_attribute('href') for _ in items])
@@ -100,13 +104,13 @@ class OzonParser:
             prop_str = prop_str.find_elements(By.TAG_NAME, "dl")
             text = ""
             for i in prop_str:
-                text += i.text + "\n"
+                text += i.text.replace("\'", "") + "\n"
             prop_str = text.replace(":", "\n").split("\n")
             for i in range(0, len(prop_str) - 1, 2):
                 properties.update({prop_str[i]: prop_str[i + 1]})
             try:
                 r_description = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn6']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn8']")))
             except:
                 pass
             if len(r_description) == 0:
@@ -121,7 +125,7 @@ class OzonParser:
                 desc = r_description[1].find_elements(By.TAG_NAME, "p")
                 if len(headers) == len(desc):
                     for i in range(len(headers)):
-                        properties.update({headers[i].text : desc[i].text})
+                        properties.update({headers[i].text.replace("\'", "") : desc[i].text.replace("\'", "")})
             # extract ozon_id
             ozon_id = item_link.split('/')
             ozon_id = ozon_id[len(ozon_id) - 2].split('-')
@@ -129,11 +133,11 @@ class OzonParser:
             # extract price
             price = ""
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='wk7 w7k']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk9 w9k']").text
             except:
                 pass
             try:
-                price = self.driver.find_element(By.XPATH, "//span[@class='wk7']").text
+                price = self.driver.find_element(By.XPATH, "//span[@class='wk9']").text
             except:
                 pass
             price = price.split("₽")[0]
@@ -214,5 +218,5 @@ if __name__ == '__main__':
     #auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
     # with open("json_backup/konditerskie_izdeliya.json") as json_file:
     #     data = json.load(json_file)
-    # WriteToDatabase.write_from_json(self.PATH, data)
+    # WriteToDatabase.write_from_json(OzonParser.PATH, data)
     auto.test_products_category()
