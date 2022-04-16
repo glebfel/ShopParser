@@ -113,17 +113,17 @@ class OzonParser:
                 properties.update({prop_str[i]: prop_str[i + 1]})
             try:
                 r_description = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']//div//div[@class='kn8']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']")))
             except:
                 pass
             if len(r_description) == 0:
                 description = ""
             elif len(r_description) == 1:
                 description = r_description[0].text
-                description = description.replace("\"", "").replace("\'", "")
+                description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "")
             elif len(r_description) == 2:
                 description = r_description[0].text
-                description = description.replace("\"", "").replace("\'", "")
+                description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "")
                 headers = r_description[1].find_elements(By.TAG_NAME, "h3")
                 desc = r_description[1].find_elements(By.TAG_NAME, "p")
                 if len(headers) == len(desc):
@@ -145,11 +145,24 @@ class OzonParser:
                 pass
             price = price.split("₽")[0]
             price = price.replace(" ", "")
+            # extract product score
+            r_sum = 0
+            score = 0
+            try:
+                self.driver.execute_script(f"window.scrollTo(0, {3*1080})")
+                score = self.driver.find_element(By.XPATH,"(//div[@data-widget='webReviewProductScore'])[3]").text
+                score = score.split("\n")
+                for i in range(1, len(score) - 1, 2):
+                    properties.update({score[i]: score[i + 1]})
+                    r_sum += int(score[i + 1])
+                score = score[0].split("/")[0]
+            except:
+                pass
             properties.update(
-                [("Описание", description), ("ozone_id", ozon_id),
+                [("Количество отзывов", r_sum), ("Оценка", score), ("Описание", description), ("ozone_id", ozon_id),
                  ("Цена (руб.)", price), ("Ссылка", item_link)])
             return properties
-        except NoSuchElementException as e:
+        except Exception as e:
             print(e)
 
     def get_subcategory_items(self, subcategory_link):
@@ -247,12 +260,3 @@ class OzonParser:
                     WriteToDatabase.write_to_db(self.PATH, subcategory)
                     self.add_parsed_category(s)
         self.driver.quit()
-
-
-if __name__ == '__main__':
-    auto = OzonParser()
-    #auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
-    # with open("json_backup/ryba_moreprodukty.json") as json_file:
-    #     data = json.load(json_file)
-    # WriteToDatabase.write_from_json(OzonParser.PATH, data)
-    auto.parse_category("https://www.ozon.ru/category/produkty-pitaniya-9200/?sorting=rating")
