@@ -114,7 +114,7 @@ class WriteToDatabase:
                 return
             # create table
             name = data[0]
-            columns = list(data[1][0].keys())
+            columns = list(data[1][1].keys())
             start = f"CREATE TABLE IF NOT EXISTS ozon.{name} ("
             end = ");"
             for i in columns:

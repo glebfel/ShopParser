@@ -1,6 +1,7 @@
 import json
 import os
 from selenium import webdriver
+from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -34,12 +35,12 @@ class OzonParser:
         """
         try:
             self.driver.get(self.MAIN_URL)
-            self.driver.find_element(By.XPATH, "//div[@class='ec5']").click()
-            categories = self.driver.find_element(By.XPATH, "//div[@class='c6e']").find_elements(By.TAG_NAME, "a")
-            category_links = [category.get_attribute('href') for category in categories[0:31]]
+            categories = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
+            category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except NoSuchElementException as e:
-            print("Exception in 'get_category_links' method: \n" + e)
+            print(e)
 
     def get_subcategory_links(self, category_link):
         """
@@ -49,7 +50,8 @@ class OzonParser:
         """
         self.driver.get(category_link + "?sorting=rating")
         try:
-            categories = self.driver.find_elements(By.XPATH, "//a[@class='s6s']")
+            categories = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='s6s']")))
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -80,13 +82,14 @@ class OzonParser:
                     next_button = next_button[0]
                 first_time = True
                 # only for products category - //a[@class='tile-hover-target li9']
+                next_button.send_keys(Keys.PAGE_DOWN)
                 items = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='n2i tile-hover-target']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='tile-hover-target i5m']")))
             except:
                 break
             links.extend([_.get_attribute('href') for _ in items])
             if next_button:
-                next_button.click()
+                self.driver.get(next_button.get_attribute('href'))
         return links
 
     def get_item_info(self, item_link):
@@ -181,16 +184,36 @@ class OzonParser:
     # auxiliary methods for parsing process optimization
     @staticmethod
     def add_parsed_category(link):
+        """
+        serialize parsed categories
+        :param link: link of the category
+        """
         with open(f"parsed_categories.txt", "a") as f:
             f.write(link + "\n")
 
     @staticmethod
     def check_if_parsed(link):
+        """
+        Check if category was serialized
+        :param link: link of the category
+        :return: boolean value
+        """
         with open(f"parsed_categories.txt", "r") as f:
             s_text = f.read()
         if link in s_text:
             return True
         return False
+
+    @staticmethod
+    def json_item_backup(item):
+        """
+        Prepares backup for parsed data
+        """
+        if not os.path.isdir("json_backup"):
+            os.mkdir("json_backup")
+        with open(f"json_backup/{item['Ссылка'].split('/')[5]}.json", "w") as write_file:
+            json.dump(item, write_file)
+        print(f"json backup of {item['Ссылка'].split('/')[5]} item was successfully created in 'json_backup' folder!")
 
     @staticmethod
     def json_backup(category):
@@ -201,9 +224,10 @@ class OzonParser:
             os.mkdir("json_backup")
         with open(f"json_backup/{category[0]}.json", "w") as write_file:
             json.dump(category, write_file)
+        print(f"json backup of {category[0]} category was successfully created in 'json_backup' folder!")
 
-    def test_products_category(self):
-        sub_links = self.get_subcategory_links("https://www.ozon.ru/category/produkty-pitaniya-9200/?sorting=rating")
+    def parse_category(self, link):
+        sub_links = self.get_subcategory_links(link)
         for s in sub_links:
             if not self.check_if_parsed(s):
                 subcategory = self.get_subcategory_items(s)
@@ -212,11 +236,23 @@ class OzonParser:
                 self.add_parsed_category(s)
         self.driver.quit()
 
+    def parse_site(self):
+        categories = self.get_category_links()
+        for c in categories:
+            sub_links = self.get_subcategory_links(c)
+            for s in sub_links:
+                if not self.check_if_parsed(s):
+                    subcategory = self.get_subcategory_items(s)
+                    self.json_backup(subcategory)
+                    WriteToDatabase.write_to_db(self.PATH, subcategory)
+                    self.add_parsed_category(s)
+        self.driver.quit()
+
 
 if __name__ == '__main__':
     auto = OzonParser()
     #auto.get_item_info("https://www.ozon.ru/product/tsukaty-bez-sahara-tykva-v-shokolade-na-sirope-topinambura-naturalnyy-produkt-barri-briyut-495980670/?advert=3Wx1uwCseQ84EAEn5X8jxfhDG7r3So4_BLkEUe8ZqENxhc7f3EwP1dMD_SQxpz5RAJVjPgV6z4Q0MITVEHKphFuiibJ3j_VlLy8A-Fvmwk-VpvPZnUJPEnKaOl3L1jiMeWbNiQ3Lf5gPW-inEAO7LWDl84PN60U-I0uzyW_yljU8amI1QMkZbLNq5LMlTN5CJ4zDy1fV0ih2CopDQ4wlXNsDM0qiqnXwoxcaZKq_FHJ-eWwcj6jdezamqzzLIj2ntSjwPCHVyWjOnvEBcApziEjkSJ9S42YJoJYxxU0hebC_Fedf4Jk3gjOr7lcur4AY3y-3JKxWKFK8-r-oKi6bgk_dc-1eGVAnmhZvR6W6TmW_WZw6rJ2rs6OLBDjJgr840OqPQmk_wimIU3pOPhguKklHr9FHOUK4OLpLQ2166BHznD_fSLfhUIKJLqrCf81dQwJQLZrwf7Nez8q3uIsQ6NZUQfoPUFNGblnLH7uRpeK8CV8YsjoaDnoFLnEmjJGTVxgNlekBsOBd-zKhbAzYJp6Kf5KdrEYRq_Z9npb9p5jY0a6TgVuQSXeJHRkEQglm")
-    # with open("json_backup/konditerskie_izdeliya.json") as json_file:
+    # with open("json_backup/ryba_moreprodukty.json") as json_file:
     #     data = json.load(json_file)
     # WriteToDatabase.write_from_json(OzonParser.PATH, data)
-    auto.test_products_category()
+    auto.parse_category("https://www.ozon.ru/category/produkty-pitaniya-9200/?sorting=rating")
