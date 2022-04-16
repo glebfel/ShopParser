@@ -5,7 +5,7 @@ from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, NoSuchWindowException, \
+from selenium.common.exceptions import TimeoutException, NoSuchWindowException, \
     StaleElementReferenceException, WebDriverException
 from db import WriteToDatabase
 
@@ -39,7 +39,7 @@ class OzonParser:
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
-        except NoSuchElementException as e:
+        except Exception as e:
             print(e)
 
     def get_subcategory_links(self, category_link):
@@ -51,7 +51,8 @@ class OzonParser:
         self.driver.get(category_link + "?sorting=rating")
         try:
             categories = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='s6s']")))
+                    EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
+            categories = categories.find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
@@ -85,11 +86,13 @@ class OzonParser:
                 next_button.send_keys(Keys.PAGE_DOWN)
                 items = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='tile-hover-target i5m']")))
-            except:
-                break
-            links.extend([_.get_attribute('href') for _ in items])
-            if next_button:
+                links.extend([_.get_attribute('href') for _ in items])
                 self.driver.get(next_button.get_attribute('href'))
+            except:
+                self.driver.execute_script(f"window.scrollTo(0, {1080})")
+                items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i5m']")
+                links.extend([_.get_attribute('href') for _ in items])
+                break
         return links
 
     def get_item_info(self, item_link):
@@ -123,7 +126,7 @@ class OzonParser:
                 description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "")
             elif len(r_description) == 2:
                 description = r_description[0].text
-                description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "")
+                description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "").replace("Показать полностью", "")
                 headers = r_description[1].find_elements(By.TAG_NAME, "h3")
                 desc = r_description[1].find_elements(By.TAG_NAME, "p")
                 if len(headers) == len(desc):
@@ -147,7 +150,7 @@ class OzonParser:
             price = price.replace(" ", "")
             # extract product score
             r_sum = 0
-            score = 0
+            score = "Нет оценок"
             try:
                 self.driver.execute_script(f"window.scrollTo(0, {3*1080})")
                 score = self.driver.find_element(By.XPATH,"(//div[@data-widget='webReviewProductScore'])[3]").text
@@ -187,8 +190,7 @@ class OzonParser:
             try:
                 subcategory.append(self.get_item_info(item))
             except (TimeoutException,StaleElementReferenceException, WebDriverException) as t:
-                print(item)
-                print(t)
+                print(f"Exception while parsing item was caught:\n{item}")
             except NoSuchWindowException as n:
                 print(n)
                 return
@@ -247,6 +249,7 @@ class OzonParser:
                 self.json_backup(subcategory)
                 WriteToDatabase.write_to_db(self.PATH, subcategory)
                 self.add_parsed_category(s)
+        print(f"category was successfully parsed!")
         self.driver.quit()
 
     def parse_site(self):
@@ -259,4 +262,5 @@ class OzonParser:
                     self.json_backup(subcategory)
                     WriteToDatabase.write_to_db(self.PATH, subcategory)
                     self.add_parsed_category(s)
+        print(f"site was successfully parsed!")
         self.driver.quit()

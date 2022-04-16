@@ -5,7 +5,6 @@ import json
 class WriteToDatabase:
     """Write category to database using PostgreSQL"""
 
-
     @staticmethod
     def read_config(config_file):
         """
@@ -51,7 +50,7 @@ class WriteToDatabase:
                 cursor.execute(c_query)
                 cursor.execute(i_query)
             # create table
-            columns = list(category[1][0].keys())
+            columns = list(max(category[1], key=len).keys())
             start = f"CREATE TABLE IF NOT EXISTS ozon.{name} ("
             end = ");"
             for i in columns:
@@ -81,6 +80,7 @@ class WriteToDatabase:
             insert_query = insert_query[0:len(insert_query) - 1]
             with connection.cursor() as cursor:
                 cursor.execute(insert_query)
+            print(f"table {name} was successfully created at 'ozon' schema and all parsed data saved!")
         except Exception as e:
             print(e)
         finally:
