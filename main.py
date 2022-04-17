@@ -10,6 +10,81 @@ from selenium.common.exceptions import NoSuchWindowException
 from db import WriteToDatabase
 
 
+class ParseTools:
+    # auxiliary methods for parsing process optimization
+    @staticmethod
+    def add_parsed_category(link):
+        """
+        serialize parsed categories
+        :param link: link of the category
+        """
+        with open(f"parsed_categories.txt", "a") as f:
+            f.write(link + "\n")
+
+    @staticmethod
+    def check_if_parsed(link):
+        """
+        Check if category was serialized
+        :param link: link of the category
+        :return: boolean value
+        """
+        with open(f"parsed_categories.txt", "r") as f:
+            s_text = f.read()
+        if link in s_text:
+            return True
+        return False
+
+    @staticmethod
+    def get_name_from_link(link):
+        """
+        Get name of category from link
+        :param link: string type link
+        :return: string type name
+        """
+        name = link.split("/")[4]
+        name = name.split("-")
+        if len(name) > 1:
+            n_name = ""
+            for i in range(len(name) - 1):
+                n_name += name[i] + "_"
+            name = n_name[0:len(n_name) - 1]
+        else:
+            name = name[0]
+        return name
+
+    @staticmethod
+    def json_item_backup(item):
+        """
+        Prepares backup for parsed data
+        """
+        if not os.path.isdir("json_backup"):
+            os.mkdir("json_backup")
+        with open(f"json_backup/{item['Ссылка'].split('/')[4]}.json", "w") as write_file:
+            json.dump(item, write_file)
+        print(f"JSON-backup of {item['Ссылка'].split('/')[4]} item was successfully created in 'json_backup' folder!")
+
+    @classmethod
+    def json_backup(cls, category, subcategory):
+        """
+        Prepares backup for parsed data
+        :param subcategory: list of dicts of items in given subcategory
+        :param category: string with link of global category
+        """
+        if not os.path.isdir("json_backup"):
+            os.mkdir("json_backup")
+        name_cat = ParseTools.get_name_from_link(category)
+        name_subcat = subcategory[0]
+        if name_cat == name_subcat:
+            with open(f"json_backup/{name_subcat}.json", "w") as write_file:
+                json.dump(subcategory, write_file)
+        else:
+            if not os.path.isdir(f"json_backup/{name_cat}"):
+                os.mkdir(f"json_backup/{name_cat}")
+            with open(f"json_backup/{name_cat}/{name_subcat}.json", "w") as write_file:
+                json.dump(subcategory, write_file)
+        print(f"JSON-backup of {name_subcat} category was successfully created in 'json_backup' folder!")
+
+
 class OzonParser:
     MAIN_URL = "https://www.ozon.ru/"
 
@@ -35,7 +110,7 @@ class OzonParser:
         try:
             self.driver.get(self.MAIN_URL)
             categories = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
+                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except Exception as e:
@@ -50,7 +125,7 @@ class OzonParser:
         self.driver.get(category_link + "?sorting=rating")
         try:
             categories = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
+                EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
             categories = categories.find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
@@ -71,7 +146,6 @@ class OzonParser:
         except Exception as e:
             print(e)
 
-
     def get_items_links(self, subcategory_link):
         """
         Gets all item's links in given page in the category (by link)
@@ -85,7 +159,7 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(subcategory_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 1000:
+        while next_button and items and len(links) < 10:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
@@ -139,12 +213,13 @@ class OzonParser:
             description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "")
         elif len(r_description) == 2:
             description = r_description[0].text
-            description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "").replace("Показать полностью", "")
+            description = description.replace("\"", "").replace("\'", "").replace("Описание\n", "").replace(
+                "Показать полностью", "")
             headers = r_description[1].find_elements(By.TAG_NAME, "h3")
             desc = r_description[1].find_elements(By.TAG_NAME, "p")
             if len(headers) == len(desc):
                 for i in range(len(headers)):
-                    properties.update({headers[i].text.replace("\'", "") : desc[i].text.replace("\'", "")})
+                    properties.update({headers[i].text.replace("\'", ""): desc[i].text.replace("\'", "")})
         # extract ozon_id
         ozon_id = item_link.split('/')
         ozon_id = ozon_id[len(ozon_id) - 2].split('-')
@@ -165,8 +240,8 @@ class OzonParser:
         r_sum = 0
         score = "Нет оценок"
         try:
-            self.driver.execute_script(f"window.scrollTo(0, {3*1080})")
-            score = self.driver.find_element(By.XPATH,"(//div[@data-widget='webReviewProductScore'])[3]").text
+            self.driver.execute_script(f"window.scrollTo(0, {3 * 1080})")
+            score = self.driver.find_element(By.XPATH, "(//div[@data-widget='webReviewProductScore'])[3]").text
             score = score.split("\n")
             for i in range(1, len(score) - 1, 2):
                 properties.update({score[i]: score[i + 1]})
@@ -185,15 +260,7 @@ class OzonParser:
         :param subcategory_link: given subcategory link
         :return: list of name od subcategory and list of dicts contains items info
         """
-        name = subcategory_link.split("/")[4]
-        name = name.split("-")
-        if len(name) > 1:
-            n_name = ""
-            for i in range(len(name) - 1):
-                n_name += name[i] + "_"
-            name = n_name[0:len(n_name) - 1]
-        else:
-            name = name[0]
+        name = ParseTools.get_name_from_link(subcategory_link)
         subcategory = []
         # iterates through all pages while button "Дальше" available
         links = self.get_items_links(subcategory_link)
@@ -207,67 +274,23 @@ class OzonParser:
                 print(f"Exception while parsing item was caught:\n{item}")
         return [name, subcategory, subcategory_link]
 
-    # auxiliary methods for parsing process optimization
-    @staticmethod
-    def add_parsed_category(link):
-        """
-        serialize parsed categories
-        :param link: link of the category
-        """
-        with open(f"parsed_categories.txt", "a") as f:
-            f.write(link + "\n")
-
-    @staticmethod
-    def check_if_parsed(link):
-        """
-        Check if category was serialized
-        :param link: link of the category
-        :return: boolean value
-        """
-        with open(f"parsed_categories.txt", "r") as f:
-            s_text = f.read()
-        if link in s_text:
-            return True
-        return False
-
-    @staticmethod
-    def json_item_backup(item):
-        """
-        Prepares backup for parsed data
-        """
-        if not os.path.isdir("json_backup"):
-            os.mkdir("json_backup")
-        with open(f"json_backup/{item['Ссылка'].split('/')[4]}.json", "w") as write_file:
-            json.dump(item, write_file)
-        print(f"JSON-backup of {item['Ссылка'].split('/')[4]} item was successfully created in 'json_backup' folder!")
-
-    @staticmethod
-    def json_backup(category):
-        """
-        Prepares backup for parsed data
-        """
-        if not os.path.isdir("json_backup"):
-            os.mkdir("json_backup")
-        with open(f"json_backup/{category[0]}.json", "w") as write_file:
-            json.dump(category, write_file)
-        print(f"JSON-backup of {category[0]} category was successfully created in 'json_backup' folder!")
-
     def parse_category(self, link):
         sub_links = self.get_subcategory_links(link)
         for s in sub_links:
-            if not self.check_if_parsed(s):
+            if not ParseTools.check_if_parsed(s):
                 subcategory = self.get_subcategory_items(s)
-                self.json_backup(subcategory)
+                ParseTools.json_backup(link, subcategory)
                 WriteToDatabase.write_to_db(subcategory)
-                self.add_parsed_category(s)
+                ParseTools.add_parsed_category(s)
             else:
-                print(f"The subcategory: {s} in category {link} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
-                      f"you want to update the data or to pass it?")
+                print(
+                    f"The subcategory: {s} in category {link} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
+                    f"you want to update the data or to pass it?")
                 print("Enter 'Y' to update or any key to continue")
                 key = input()
                 if key == 'y' or key == 'Y':
                     subcategory = self.get_subcategory_items(s)
-                    self.json_backup(subcategory)
+                    ParseTools.json_backup(link, subcategory)
                     WriteToDatabase.update_to_db(subcategory)
         print(f"Category was successfully parsed!")
         self.driver.quit()
@@ -277,11 +300,11 @@ class OzonParser:
         for c in categories:
             sub_links = self.get_subcategory_links(c)
             for s in sub_links:
-                if not self.check_if_parsed(s):
+                if not ParseTools.check_if_parsed(s):
                     subcategory = self.get_subcategory_items(s)
-                    self.json_backup(subcategory)
+                    ParseTools.json_backup(c, subcategory)
                     WriteToDatabase.write_to_db(subcategory)
-                    self.add_parsed_category(s)
+                    ParseTools.add_parsed_category(s)
                 else:
                     print(
                         f"The subcategory: {s} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
@@ -290,7 +313,7 @@ class OzonParser:
                     key = input()
                     if key == 'y' or key == 'Y':
                         subcategory = self.get_subcategory_items(s)
-                        self.json_backup(subcategory)
+                        ParseTools.json_backup(c, subcategory)
                         WriteToDatabase.update_to_db(subcategory)
         print(f"Site was successfully parsed!")
         self.driver.quit()
