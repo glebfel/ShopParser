@@ -55,8 +55,22 @@ class OzonParser:
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except:
+            pass
+        try:
             categories = self.driver.find_element(By.XPATH, "//a[@class='s6s ss7']")
             return [categories.get_attribute('href')]
+        except:
+            pass
+        try:
+            self.driver.get(category_link)
+            categories = WebDriverWait(self.driver, 3).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
+            categories = categories.find_elements(By.TAG_NAME, "a")
+            category_links = [category.get_attribute('href') for category in categories]
+            return category_links
+        except Exception as e:
+            print(e)
+
 
     def get_items_links(self, subcategory_link):
         """
