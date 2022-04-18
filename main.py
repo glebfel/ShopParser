@@ -1,4 +1,5 @@
 import json
+import requests
 import os
 import time
 from selenium import webdriver
@@ -76,12 +77,12 @@ class ParseTools:
         name_subcat = subcategory[0]
         if name_cat == name_subcat:
             with open(f"json_backup/{name_subcat}.json", "w") as write_file:
-                json.dump(subcategory, write_file)
+                json.dump(subcategory[1], write_file)
         else:
             if not os.path.isdir(f"json_backup/{name_cat}"):
                 os.mkdir(f"json_backup/{name_cat}")
             with open(f"json_backup/{name_cat}/{name_subcat}.json", "w") as write_file:
-                json.dump(subcategory, write_file)
+                json.dump(subcategory[1], write_file)
         print(f"JSON-backup of {name_subcat} category was successfully created in 'json_backup' folder!")
 
 
@@ -317,3 +318,124 @@ class OzonParser:
                         WriteToDatabase.update_to_db(subcategory)
         print(f"Site was successfully parsed!")
         self.driver.quit()
+
+
+class WildberriesParser:
+    MAIN_URL = "https://www.wildberries.ru"
+
+    def __init__(self):
+        options = webdriver.ChromeOptions()
+        options.page_load_strategy = 'eager'
+        options.add_argument("start-maximized")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-browser-side-navigation")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--dns-prefetch-disable")
+        options.add_argument("--incognito")
+        options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(15)
+
+    def get_category_links(self):
+        """
+        Gets categories and their links for later parsing
+        :return: list of category links
+        """
+        try:
+            r = requests.get("https://www.wildberries.ru/gettopmenuinner?lang=ru").json()
+            r = r['value']['menu']
+            categories = []
+            for _ in r:
+                if 'catalog' in _['pageUrl']:
+                    categories.append(self.MAIN_URL + _['pageUrl'])
+            return categories
+        except Exception as e:
+            print(e)
+
+    def get_subcategory_links(self, category_link):
+        """
+        Gets subcategory links in given category
+        :param category_link: given category link
+        :return: list of subcategory links
+        """
+        try:
+            self.driver.get(category_link)
+            subcategories = WebDriverWait(self.driver, 3).until(
+                EC.presence_of_element_located((By.XPATH, "//ul[@class='menu-catalog__list-2 maincatalog-list-2']")))
+            subcategories = subcategories.find_elements(By.TAG_NAME, "a")
+            subcategory_links = [c.get_attribute('href') for c in subcategories]
+            return subcategory_links
+        except Exception as e:
+            print(e)
+
+    def get_items_links(self, page_link):
+        """
+        Gets all item's links in given page in the category (by link)
+        :param page_link: given subcategory link
+        :return: list of item's links in given page
+        """
+        links = []
+        items = True
+        next_button = True
+        # iterates through all pages while button "Дальше" available
+        self.driver.get(page_link)
+        # take a restriction of 1000 for the number of products due to long time process
+        while next_button and items and len(links) < 10:
+            try:
+                next_button = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_element_located((By.XPATH, "//a[contains(text(),'Следующая страница')]")))
+                next_button.send_keys(Keys.PAGE_DOWN)
+                items = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='product-card__main j-card-link']")))
+                links.extend([_.get_attribute('href') for _ in items])
+                self.driver.get(next_button.get_attribute('href'))
+            except:
+                break
+        return links
+
+    def get_item_info(self, item_link):
+        """
+        Gets info from description of an item
+        :param item_link: given item's link
+        :return: dict with parsed info of an item
+        """
+        properties = {}
+        id = item_link.split("/")[4]
+        r = requests.get(f"https://wbx-content-v2.wbstatic.net/ru/{id}.json").json()
+        n_list = ['imt_id', 'subj_root_name', 'grouped_options', 'colors', 'full_colors', 'tnved', 'media', 'data']
+        for _ in r:
+            if _ not in n_list:
+                if isinstance(r[_], list):
+                    for i in r[_]:
+                        if 'measure' in i:
+                            properties.update({f"{i['name']} ({i['measure']})": i['value']})
+                        else:
+                            properties.update({i['name']: i['value']})
+                else:
+                    properties.update({_: r[_]})
+        return properties
+
+    # def get_subcategory_items(self, subcategory_link):
+    #     """
+    #     Gets all items in given subcategory
+    #     :param subcategory_link: given subcategory link
+    #     :return: list containing name of subcategory, list of dicts contains items info and link of the subcategory
+    #     """
+    #     name = ParseTools.get_name_from_link(subcategory_link)
+    #     subcategory = []
+    #     # iterates through all pages while button "Дальше" available
+    #     links = self.get_items_links(subcategory_link)
+    #     for item in links:
+    #         try:
+    #             subcategory.append(self.get_item_info(item))
+    #         except NoSuchWindowException as n:
+    #             print(n)
+    #             return
+    #         except Exception:
+    #             print(f"Exception while parsing item was caught:\n{item}")
+    #     return [name, subcategory, subcategory_link]
+
+
+# w = WildberriesParser()
+# w.get_item_info('https://www.wildberries.ru/catalog/53925878/detail.aspx?targetUrl=GP')
