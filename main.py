@@ -146,10 +146,10 @@ class OzonParser:
         except Exception as e:
             print(e)
 
-    def get_items_links(self, subcategory_link):
+    def get_items_links(self, page_link):
         """
         Gets all item's links in given page in the category (by link)
-        :param subcategory_link: given subcategory link
+        :param page_link: given subcategory link
         :return: list of item's links in given page
         """
         links = []
@@ -157,7 +157,7 @@ class OzonParser:
         next_button = True
         first_time = False
         # iterates through all pages while button "Дальше" available
-        self.driver.get(subcategory_link)
+        self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
         while next_button and items and len(links) < 10:
             try:
@@ -166,7 +166,7 @@ class OzonParser:
                 if len(next_button) > 1:
                     next_button = next_button[1]
                 else:
-                    if self.driver.current_url == subcategory_link and first_time:
+                    if self.driver.current_url == page_link and first_time:
                         break
                     next_button = next_button[0]
                 first_time = True
@@ -258,7 +258,7 @@ class OzonParser:
         """
         Gets all items in given subcategory
         :param subcategory_link: given subcategory link
-        :return: list of name od subcategory and list of dicts contains items info
+        :return: list containing name of subcategory, list of dicts contains items info and link of the subcategory
         """
         name = ParseTools.get_name_from_link(subcategory_link)
         subcategory = []

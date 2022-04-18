@@ -24,7 +24,7 @@ class WriteToDatabase:
     @staticmethod
     def write_to_db(category):
         """
-        Creates table with collected data for given categoryn
+        Creates table with collected data for given category
         :param category: list of dicts contains subcategories and items in it
         """
         try:
