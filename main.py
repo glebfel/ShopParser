@@ -87,7 +87,6 @@ class ParseTools:
 
 
 class OzonParser:
-    MAIN_URL = "https://www.ozon.ru/"
 
     def __init__(self):
         options = webdriver.ChromeOptions()
@@ -109,7 +108,7 @@ class OzonParser:
         :return: list of category links
         """
         try:
-            self.driver.get(self.MAIN_URL)
+            self.driver.get("https://www.ozon.ru/")
             categories = WebDriverWait(self.driver, 3).until(
                 EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
             category_links = [category.get_attribute('href') for category in categories]
@@ -239,7 +238,7 @@ class OzonParser:
         price = price.replace(" ", "")
         # extract product score
         r_sum = 0
-        score = "Нет оценок"
+        score = ""
         try:
             self.driver.execute_script(f"window.scrollTo(0, {3 * 1080})")
             score = self.driver.find_element(By.XPATH, "(//div[@data-widget='webReviewProductScore'])[3]").text
@@ -248,6 +247,8 @@ class OzonParser:
                 properties.update({score[i]: score[i + 1]})
                 r_sum += int(score[i + 1])
             score = score[0].split("/")[0]
+            if 'Нет оценок' in score:
+                score = ""
         except:
             pass
         properties.update(
@@ -321,7 +322,6 @@ class OzonParser:
 
 
 class WildberriesParser:
-    MAIN_URL = "https://www.wildberries.ru"
 
     def __init__(self):
         options = webdriver.ChromeOptions()
@@ -348,7 +348,7 @@ class WildberriesParser:
             categories = []
             for _ in r:
                 if 'catalog' in _['pageUrl']:
-                    categories.append(self.MAIN_URL + _['pageUrl'])
+                    categories.append("https://www.wildberries.ru" + _['pageUrl'])
             return categories
         except Exception as e:
             print(e)
