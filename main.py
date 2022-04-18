@@ -198,7 +198,7 @@ class OzonParser:
         prop_str = prop_str.find_elements(By.TAG_NAME, "dl")
         text = ""
         for i in prop_str:
-            text += i.text.replace("\'", "") + "\n"
+            text += i.text.replace("\'", "").replace("₽", "") + "\n"
         prop_str = text.replace(":", "\n").split("\n")
         for i in range(0, len(prop_str) - 1, 2):
             properties.update({prop_str[i]: prop_str[i + 1]})
