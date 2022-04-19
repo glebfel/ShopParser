@@ -42,15 +42,18 @@ class ParseTools:
         :param link: string type link
         :return: string type name
         """
-        name = link.split("/")[4]
-        name = name.split("-")
-        if len(name) > 1:
-            n_name = ""
-            for i in range(len(name) - 1):
-                n_name += name[i] + "_"
-            name = n_name[0:len(n_name) - 1]
-        else:
-            name = name[0]
+        if 'ozon' in link:
+            name = link.split("/")[4]
+            name = name.split("-")
+            if len(name) > 1:
+                n_name = ""
+                for i in range(len(name) - 1):
+                    n_name += name[i] + "_"
+                name = n_name[0:len(n_name) - 1]
+            else:
+                name = name[0]
+        elif 'wildberries' in link:
+            name = link.split("/")[4]
         return name
 
     @staticmethod
@@ -60,9 +63,18 @@ class ParseTools:
         """
         if not os.path.isdir("json_backup"):
             os.mkdir("json_backup")
-        with open(f"json_backup/{item['Ссылка'].split('/')[4]}.json", "w") as write_file:
-            json.dump(item, write_file)
-        print(f"JSON-backup of {item['Ссылка'].split('/')[4]} item was successfully created in 'json_backup' folder!")
+        if 'ozon' in item['Ссылка']:
+            if not os.path.isdir("json_backup/ozon"):
+                os.mkdir("json_backup/ozon")
+            with open(f"json_backup/ozon/{item['Ссылка'].split('/')[4]}.json", "w") as write_file:
+                json.dump(item, write_file)
+            print(f"JSON-backup of {item['Ссылка'].split('/')[4]} item was successfully created in 'json_backup' folder!")
+        elif 'wildberries' in item['Ссылка']:
+            if not os.path.isdir("json_backup/wildberries"):
+                os.mkdir("json_backup/wildberries")
+            with open(f"json_backup/wildberries/{item['Ссылка'].split('/')[4]}.json", "w") as write_file:
+                json.dump(item, write_file)
+            print(f"JSON-backup of {item['Ссылка'].split('/')[4]} item was successfully created in 'json_backup' directory!")
 
     @classmethod
     def json_backup(cls, category, subcategory):
@@ -75,15 +87,29 @@ class ParseTools:
             os.mkdir("json_backup")
         name_cat = ParseTools.get_name_from_link(category)
         name_subcat = subcategory[0]
-        if name_cat == name_subcat:
-            with open(f"json_backup/{name_subcat}.json", "w") as write_file:
-                json.dump(subcategory[1], write_file)
-        else:
-            if not os.path.isdir(f"json_backup/{name_cat}"):
-                os.mkdir(f"json_backup/{name_cat}")
-            with open(f"json_backup/{name_cat}/{name_subcat}.json", "w") as write_file:
-                json.dump(subcategory[1], write_file)
-        print(f"JSON-backup of {name_subcat} category was successfully created in 'json_backup' folder!")
+        if 'ozon' in subcategory[2]:
+            if not os.path.isdir("json_backup/ozon"):
+                os.mkdir("json_backup/ozon")
+            if name_cat == name_subcat:
+                with open(f"json_backup/ozon/{name_subcat}.json", "w") as write_file:
+                    json.dump(subcategory[1], write_file)
+            else:
+                if not os.path.isdir(f"json_backup/ozon/{name_cat}"):
+                    os.mkdir(f"json_backup/ozon/{name_cat}")
+                with open(f"json_backup/ozon/{name_cat}/{name_subcat}.json", "w") as write_file:
+                    json.dump(subcategory[1], write_file)
+        elif 'wildberries' in subcategory[2]:
+            if not os.path.isdir("json_backup/wildberries"):
+                os.mkdir("json_backup/wildberries")
+            if name_cat == name_subcat:
+                with open(f"json_backup/wildberries/{name_subcat}.json", "w") as write_file:
+                    json.dump(subcategory[1], write_file)
+            else:
+                if not os.path.isdir(f"json_backup/wildberries/{name_cat}"):
+                    os.mkdir(f"json_backup/wildberries/{name_cat}")
+                with open(f"json_backup/wildberries/{name_cat}/{name_subcat}.json", "w") as write_file:
+                    json.dump(subcategory[1], write_file)
+        print(f"JSON-backup of {name_subcat} category was successfully created in 'json_backup' directory!")
 
 
 class OzonParser:
@@ -109,8 +135,8 @@ class OzonParser:
         """
         try:
             self.driver.get("https://www.ozon.ru/")
-            categories = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
+            categories = WebDriverWait(self.driver, 1).until(
+                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='sg3 e4c c5e']")))
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except Exception as e:
@@ -123,28 +149,15 @@ class OzonParser:
         :return: list of subcategory links
         """
         self.driver.get(category_link + "?sorting=rating")
+        category_links = []
         try:
-            categories = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
+            categories = WebDriverWait(self.driver, 1).until(
+                EC.presence_of_element_located((By.XPATH, "//div[@class='t2s']")))
             categories = categories.find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories]
-            return category_links
         except:
             pass
-        try:
-            categories = self.driver.find_element(By.XPATH, "//a[@class='s6s ss7']")
-            return [categories.get_attribute('href')]
-        except:
-            pass
-        try:
-            self.driver.get(category_link)
-            categories = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='s7s']")))
-            categories = categories.find_elements(By.TAG_NAME, "a")
-            category_links = [category.get_attribute('href') for category in categories]
-            return category_links
-        except Exception as e:
-            print(e)
+        return category_links
 
     def get_items_links(self, page_link):
         """
@@ -161,7 +174,7 @@ class OzonParser:
         # take a restriction of 1000 for the number of products due to long time process
         while next_button and items and len(links) < 700:
             try:
-                next_button = WebDriverWait(self.driver, 3).until(
+                next_button = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
                 if len(next_button) > 1:
                     next_button = next_button[1]
@@ -170,15 +183,15 @@ class OzonParser:
                         break
                     next_button = next_button[0]
                 first_time = True
-                # only for products category - //a[@class='tile-hover-target li9']
+                # except 'automobili' category
                 next_button.send_keys(Keys.PAGE_DOWN)
-                items = WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='tile-hover-target i5m']")))
+                items = WebDriverWait(self.driver, 1).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='in3 tile-hover-target']")))
                 links.extend([_.get_attribute('href') for _ in items])
                 self.driver.get(next_button.get_attribute('href'))
             except:
                 self.driver.execute_script(f"window.scrollTo(0, {1080})")
-                items = self.driver.find_elements(By.XPATH, "//a[@class='tile-hover-target i5m']")
+                items = self.driver.find_elements(By.XPATH, "//a[@class='in3 tile-hover-target']")
                 links.extend([_.get_attribute('href') for _ in items])
                 break
         return links
@@ -192,7 +205,7 @@ class OzonParser:
         properties = {}
         r_description = []
         self.driver.get(item_link)
-        prop_str = WebDriverWait(self.driver, 3).until(
+        prop_str = WebDriverWait(self.driver, 1).until(
             EC.presence_of_element_located((By.XPATH, "//div[@id='section-characteristics']")))
         prop_str = prop_str.find_elements(By.TAG_NAME, "dl")
         text = ""
@@ -202,7 +215,7 @@ class OzonParser:
         for i in range(0, len(prop_str) - 1, 2):
             properties.update({prop_str[i]: prop_str[i + 1]})
         try:
-            r_description = WebDriverWait(self.driver, 3).until(
+            r_description = WebDriverWait(self.driver, 1).until(
                 EC.presence_of_all_elements_located((By.XPATH, "//div[@id='section-description']")))
         except:
             pass
@@ -227,14 +240,15 @@ class OzonParser:
 
         # extract name of the item
         name = self.driver.find_element(By.XPATH, "//div[@data-widget='webProductHeading']").text
+        name = name.replace("\"", "").replace("\'", "")
         # extract price
         price = ""
         try:
-            price = self.driver.find_element(By.XPATH, "//span[@class='wk9 w9k']").text
+            price = self.driver.find_element(By.XPATH, "//span[@class='w9k kx']").text
         except:
             pass
         try:
-            price = self.driver.find_element(By.XPATH, "//span[@class='wk9']").text
+            price = self.driver.find_element(By.XPATH, "//span[@class='w9k']").text
         except:
             pass
         price = price.split("₽")[0]
@@ -365,8 +379,19 @@ class WildberriesParser:
         """
         try:
             self.driver.get(category_link)
-            subcategories = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, "//ul[@class='menu-catalog__list-2 maincatalog-list-2']")))
+            subcategories = []
+            try:
+                subcategories = WebDriverWait(self.driver, 1).until(
+                    EC.presence_of_element_located((By.XPATH, "//ul[@class='menu-catalog__list-2 maincatalog-list-2']")))
+            except:
+                pass
+            try:
+                subcategories = WebDriverWait(self.driver, 1).until(
+                    EC.presence_of_element_located((By.XPATH, "//li[@class='selected hasnochild']//ul")))
+            except:
+                pass
+            if not subcategories:
+                return [category_link]
             subcategories = subcategories.find_elements(By.TAG_NAME, "a")
             subcategory_links = [c.get_attribute('href') for c in subcategories]
             return subcategory_links
@@ -404,6 +429,7 @@ class WildberriesParser:
         :param item_link: given item's link
         :return: dict with parsed info of an item
         """
+        self.driver.get(item_link)
         properties = {}
         id = item_link.split("/")[4]
         r = requests.get(f"https://wbx-content-v2.wbstatic.net/ru/{id}.json").json()
@@ -431,17 +457,28 @@ class WildberriesParser:
                          f"-1255563&nm={id}").json()
         price = price['data']['products'][0]['salePriceU']
         # parse product score
-        self.driver.get(item_link)
         self.driver.execute_script(f"window.scrollTo(0, {3 * 1080})")
-        score = self.driver.find_element(By.XPATH, "//div[@class='user-scores__rating']").text
-        score = score.split("\n")
-        average_score = score[0]
-        score_number = score[1].split(" ")[2]
-        five_score_num = round(int(score_number)*int(score[3].replace("%", ""))/100)
-        four_score_num = round(int(score_number)*int(score[5].replace("%", ""))/100)
-        three_score_num = round(int(score_number)*int(score[7].replace("%", ""))/100)
-        two_score_num = round(int(score_number)*int(score[9].replace("%", ""))/100)
-        one_score_num = round(int(score_number)*int(score[11].replace("%", ""))/100)
+        average_score = 0
+        score_number = 0
+        five_score_num = 0
+        four_score_num = 0
+        three_score_num = 0
+        two_score_num = 0
+        one_score_num = 0
+        try:
+            score = WebDriverWait(self.driver, 1).until(
+                    EC.presence_of_element_located((By.XPATH, "//div[@class='user-scores__rating']"))).text
+            print("+")
+            score = score.split("\n")
+            average_score = score[0]
+            score_number = score[1].split(" ")[2]
+            five_score_num = round(int(score_number)*int(score[3].replace("%", ""))/100)
+            four_score_num = round(int(score_number)*int(score[5].replace("%", ""))/100)
+            three_score_num = round(int(score_number)*int(score[7].replace("%", ""))/100)
+            two_score_num = round(int(score_number)*int(score[9].replace("%", ""))/100)
+            one_score_num = round(int(score_number)*int(score[11].replace("%", ""))/100)
+        except Exception as e:
+            pass
         properties.update(
             [("price", price), ("link", item_link), ("average_score", average_score), ("score_number", score_number), ("five_score_num", five_score_num),
              ("four_score_num", four_score_num),

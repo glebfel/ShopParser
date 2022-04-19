@@ -90,7 +90,7 @@ class WriteToDatabase:
                 name = category[0]
                 c_query = f'CREATE TABLE IF NOT EXISTS wildberries.category ("Категория" TEXT,"Количество товара" TEXT, "Ссылка" TEXT);'
                 # insert category in categories table
-                i_query = f"INSERT INTO ozon.category VALUES ('{name}','{len(category[1])}', '{category[2]}');"
+                i_query = f"INSERT INTO wildberries.category VALUES ('{name}','{len(category[1])}', '{category[2]}');"
                 with connection.cursor() as cursor:
                     cursor.execute(c_query)
                     cursor.execute(i_query)
