@@ -224,6 +224,9 @@ class OzonParser:
         ozon_id = item_link.split('/')
         ozon_id = ozon_id[len(ozon_id) - 2].split('-')
         ozon_id = ozon_id[len(ozon_id) - 1]
+
+        # extract name of the item
+        name = self.driver.find_element(By.XPATH, "//div[@data-widget='webProductHeading']").text
         # extract price
         price = ""
         try:
@@ -252,7 +255,8 @@ class OzonParser:
         except:
             pass
         properties.update(
-            [("Количество отзывов", r_sum), ("Оценка", score), ("Описание", description), ("ozone_id", ozon_id),
+            [("Название", name), ("Количество отзывов", r_sum), ("Оценка", score), ("Описание", description),
+             ("ozone_id", ozon_id),
              ("Цена (руб.)", price), ("Ссылка", item_link)])
         return properties
 
@@ -403,39 +407,111 @@ class WildberriesParser:
         properties = {}
         id = item_link.split("/")[4]
         r = requests.get(f"https://wbx-content-v2.wbstatic.net/ru/{id}.json").json()
-        n_list = ['imt_id', 'subj_root_name', 'grouped_options', 'colors', 'full_colors', 'tnved', 'media', 'data']
+        n_list = ['imt_id', 'subj_root_name', 'grouped_options', 'colors', 'full_colors', 'tnved', 'media', 'data', 'sizes_table']
         for _ in r:
-            if _ not in n_list:
+            if _ == 'kinds':
+                properties.update({_: r[_][0]})
+            elif _ not in n_list:
                 if isinstance(r[_], list):
                     for i in r[_]:
-                        if 'measure' in i:
-                            properties.update({f"{i['name']} ({i['measure']})": i['value']})
-                        else:
-                            properties.update({i['name']: i['value']})
+                        if 'name' in i and 'value' in i:
+                            if 'measure' in i:
+                                properties.update({f"{i['name']} ({i['measure']})": i['value']})
+                            else:
+                                properties.update({i['name']: i['value']})
                 else:
                     properties.update({_: r[_]})
+
+        # parse product price
+        price = requests.get(f"https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?spp=0&regions=64,83,4,38,33,70,82,"
+                         f"75,30,69,86,40,22,1,31,66,48,71,80,68&stores=117673,122258,122259,125238,125239,125240,"
+                         f"6159,507,3158,117501,120602,120762,6158,121709,124731,159402,2737,130744,117986,1733,686,"
+                         f"132043&pricemarginCoeff=1.0&reg=0&appType=1&offlineBonus=0&onlineBonus=0&emp=0&locale=ru"
+                         f"&lang=ru&curr=rub&couponsGeo=12,3,18,15,21&dest=-1029256,-102269,-1278703,"
+                         f"-1255563&nm={id}").json()
+        price = price['data']['products'][0]['salePriceU']
+        # parse product score
+        self.driver.get(item_link)
+        self.driver.execute_script(f"window.scrollTo(0, {3 * 1080})")
+        score = self.driver.find_element(By.XPATH, "//div[@class='user-scores__rating']").text
+        score = score.split("\n")
+        average_score = score[0]
+        score_number = score[1].split(" ")[2]
+        five_score_num = round(int(score_number)*int(score[3].replace("%", ""))/100)
+        four_score_num = round(int(score_number)*int(score[5].replace("%", ""))/100)
+        three_score_num = round(int(score_number)*int(score[7].replace("%", ""))/100)
+        two_score_num = round(int(score_number)*int(score[9].replace("%", ""))/100)
+        one_score_num = round(int(score_number)*int(score[11].replace("%", ""))/100)
+        properties.update(
+            [("price", price) ("link", item_link), ("average_score", average_score), ("score_number", score_number), ("five_score_num", five_score_num),
+             ("four_score_num", four_score_num),
+             ("three_score_num", three_score_num), ("two_score_num", two_score_num), ("one_score_nu", one_score_num)])
         return properties
 
-    # def get_subcategory_items(self, subcategory_link):
-    #     """
-    #     Gets all items in given subcategory
-    #     :param subcategory_link: given subcategory link
-    #     :return: list containing name of subcategory, list of dicts contains items info and link of the subcategory
-    #     """
-    #     name = ParseTools.get_name_from_link(subcategory_link)
-    #     subcategory = []
-    #     # iterates through all pages while button "Дальше" available
-    #     links = self.get_items_links(subcategory_link)
-    #     for item in links:
-    #         try:
-    #             subcategory.append(self.get_item_info(item))
-    #         except NoSuchWindowException as n:
-    #             print(n)
-    #             return
-    #         except Exception:
-    #             print(f"Exception while parsing item was caught:\n{item}")
-    #     return [name, subcategory, subcategory_link]
+    def get_subcategory_items(self, subcategory_link):
+        """
+        Gets all items in given subcategory
+        :param subcategory_link: given subcategory link
+        :return: list containing name of subcategory, list of dicts contains items info and link of the subcategory
+        """
+        name = ParseTools.get_name_from_link(subcategory_link)
+        subcategory = []
+        # iterates through all pages while button "Дальше" available
+        links = self.get_items_links(subcategory_link)
+        for item in links:
+            try:
+                subcategory.append(self.get_item_info(item))
+            except NoSuchWindowException as n:
+                print(n)
+                return
+            except Exception:
+                print(f"Exception while parsing item was caught:\n{item}")
+        return [name, subcategory, subcategory_link]
+
+    def parse_category(self, link):
+        sub_links = self.get_subcategory_links(link)
+        for s in sub_links:
+            if not ParseTools.check_if_parsed(s):
+                subcategory = self.get_subcategory_items(s)
+                ParseTools.json_backup(link, subcategory)
+                WriteToDatabase.write_to_db(subcategory)
+                ParseTools.add_parsed_category(s)
+            else:
+                print(
+                    f"The subcategory: {s} in category {link} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
+                    f"you want to update the data or to pass it?")
+                print("Enter 'Y' to update or any key to continue")
+                key = input()
+                if key == 'y' or key == 'Y':
+                    subcategory = self.get_subcategory_items(s)
+                    ParseTools.json_backup(link, subcategory)
+                    WriteToDatabase.update_to_db(subcategory)
+        print(f"Category was successfully parsed!")
+        self.driver.quit()
+
+    def parse_site(self):
+        categories = self.get_category_links()
+        for c in categories:
+            sub_links = self.get_subcategory_links(c)
+            for s in sub_links:
+                if not ParseTools.check_if_parsed(s):
+                    subcategory = self.get_subcategory_items(s)
+                    ParseTools.json_backup(c, subcategory)
+                    WriteToDatabase.write_to_db(subcategory)
+                    ParseTools.add_parsed_category(s)
+                else:
+                    print(
+                        f"The subcategory: {s} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
+                        f"you want to update the data or to pass it?")
+                    print("Enter 'Y' to update or any key to continue")
+                    key = input()
+                    if key == 'y' or key == 'Y':
+                        subcategory = self.get_subcategory_items(s)
+                        ParseTools.json_backup(c, subcategory)
+                        WriteToDatabase.update_to_db(subcategory)
+        print(f"Site was successfully parsed!")
+        self.driver.quit()
 
 
-# w = WildberriesParser()
-# w.get_item_info('https://www.wildberries.ru/catalog/53925878/detail.aspx?targetUrl=GP')
+w = WildberriesParser()
+w.get_item_info('https://www.wildberries.ru/catalog/15875670/detail.aspx?targetUrl=MI')
