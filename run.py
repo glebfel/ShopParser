@@ -1,6 +1,6 @@
 import validators
 import keyboard
-from main import OzonParser
+from main import OzonParser, WildberriesParser
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 
 
@@ -25,6 +25,17 @@ def main():
                     else:
                         # site url
                         Ozon.parse_site()
+                elif 'wildberries' in address:
+                    if 'category' in address:
+                        # category url
+                        WildberriesParser.parse_category(address)
+                    elif 'product' in address:
+                        # item url
+                        data = WildberriesParser.get_item_info(address)
+                        WildberriesParser.json_item_backup(data)
+                    else:
+                        # site url
+                        WildberriesParser.parse_site()
             except (NoSuchWindowException, WebDriverException):
                 print("The parser window was closed!")
             print("Press any key to continue or press 'ESC' to exit: ")

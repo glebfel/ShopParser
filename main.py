@@ -159,7 +159,7 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 10:
+        while next_button and items and len(links) < 700:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
@@ -385,7 +385,7 @@ class WildberriesParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 10:
+        while next_button and items and len(links) < 700:
             try:
                 next_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, "//a[contains(text(),'Следующая страница')]")))
@@ -443,7 +443,7 @@ class WildberriesParser:
         two_score_num = round(int(score_number)*int(score[9].replace("%", ""))/100)
         one_score_num = round(int(score_number)*int(score[11].replace("%", ""))/100)
         properties.update(
-            [("price", price) ("link", item_link), ("average_score", average_score), ("score_number", score_number), ("five_score_num", five_score_num),
+            [("price", price), ("link", item_link), ("average_score", average_score), ("score_number", score_number), ("five_score_num", five_score_num),
              ("four_score_num", four_score_num),
              ("three_score_num", three_score_num), ("two_score_num", two_score_num), ("one_score_nu", one_score_num)])
         return properties
@@ -511,7 +511,3 @@ class WildberriesParser:
                         WriteToDatabase.update_to_db(subcategory)
         print(f"Site was successfully parsed!")
         self.driver.quit()
-
-
-w = WildberriesParser()
-w.get_item_info('https://www.wildberries.ru/catalog/15875670/detail.aspx?targetUrl=MI')
