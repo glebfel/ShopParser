@@ -15,7 +15,7 @@ def main():
             try:
                 if 'ozon' in address:
                     Ozon = OzonParser()
-                    if 'category' in address:
+                    if 'category' in address or 'highlight' in address:
                         # category url
                         Ozon.parse_category(address)
                     elif 'product' in address:
@@ -37,6 +37,8 @@ def main():
                     else:
                         # site url
                         wb.parse_site()
+                else:
+                    print("This site has not supported yet! Parser can process only 'Ozon' and 'Wildberries'.")
             except (NoSuchWindowException, WebDriverException):
                 print("The parser window was closed!")
             print("Press any key to continue or press 'ESC' to exit: ")

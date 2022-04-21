@@ -136,7 +136,7 @@ class OzonParser:
         try:
             self.driver.get("https://www.ozon.ru/")
             categories = WebDriverWait(self.driver, 1).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='sg3 e4c c5e']")))
+                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
             category_links = [category.get_attribute('href') for category in categories]
             return category_links
         except Exception as e:
@@ -149,15 +149,15 @@ class OzonParser:
         :return: list of subcategory links
         """
         self.driver.get(category_link + "?sorting=rating")
-        category_links = []
         try:
             categories = WebDriverWait(self.driver, 1).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='t2s']")))
+                EC.presence_of_element_located((By.XPATH, "//div[@class='s2t']")))
             categories = categories.find_elements(By.TAG_NAME, "a")
             category_links = [category.get_attribute('href') for category in categories]
+            return category_links
         except:
             pass
-        return category_links
+        return [category_link]
 
     def get_items_links(self, page_link):
         """
@@ -172,10 +172,10 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 700:
+        while next_button and items and len(links) < 1000:
             try:
                 next_button = WebDriverWait(self.driver, 1).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-b3']")))
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-c3']")))
                 if len(next_button) > 1:
                     next_button = next_button[1]
                 else:
@@ -183,16 +183,23 @@ class OzonParser:
                         break
                     next_button = next_button[0]
                 first_time = True
-                # except 'automobili' category
                 next_button.send_keys(Keys.PAGE_DOWN)
                 items = WebDriverWait(self.driver, 1).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='in3 tile-hover-target']")))
-                links.extend([_.get_attribute('href') for _ in items])
+                    EC.presence_of_element_located((By.XPATH, "//div[@data-widget='searchResultsV2']")))
+                items = items.find_elements(By.TAG_NAME, 'a')
+                items = [_.get_attribute('href') for _ in items]
+                items = [_ for _ in items if 'comments--offset-80' not in _]
+                items = list(dict.fromkeys(items))
+                links.extend(items)
                 self.driver.get(next_button.get_attribute('href'))
             except:
                 self.driver.execute_script(f"window.scrollTo(0, {1080})")
-                items = self.driver.find_elements(By.XPATH, "//a[@class='in3 tile-hover-target']")
-                links.extend([_.get_attribute('href') for _ in items])
+                items = self.driver.find_element(By.XPATH, "//div[@data-widget='searchResultsV2']")
+                items = items.find_elements(By.TAG_NAME, 'a')
+                items = [_.get_attribute('href') for _ in items]
+                items = [_ for _ in items if 'comments--offset-80' not in _]
+                items = list(dict.fromkeys(items))
+                links.extend(items)
                 break
         return links
 
@@ -243,14 +250,7 @@ class OzonParser:
         name = name.replace("\"", "").replace("\'", "")
         # extract price
         price = ""
-        try:
-            price = self.driver.find_element(By.XPATH, "//span[@class='w9k kx']").text
-        except:
-            pass
-        try:
-            price = self.driver.find_element(By.XPATH, "//span[@class='w9k']").text
-        except:
-            pass
+        price = self.driver.find_element(By.XPATH, "//div[@data-widget='webPrice']").text
         price = price.split("₽")[0]
         price = price.replace(" ", "")
         # extract product score
@@ -290,7 +290,8 @@ class OzonParser:
             except NoSuchWindowException as n:
                 print(n)
                 return
-            except Exception:
+            except Exception as e:
+                print(e)
                 print(f"Exception while parsing item was caught:\n{item}")
         return [name, subcategory, subcategory_link]
 
