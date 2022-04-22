@@ -137,7 +137,7 @@ class OzonParser:
             self.driver.get("https://www.ozon.ru/")
             categories = WebDriverWait(self.driver, 1).until(
                 EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
-            category_links = [category.get_attribute('href') for category in categories]
+            category_links = [category.get_attribute('href') + "?sorting=score" for category in categories]
             return category_links
         except Exception as e:
             print(e)
@@ -148,7 +148,7 @@ class OzonParser:
         :param category_link: given category link
         :return: list of subcategory links
         """
-        self.driver.get(category_link + "?sorting=rating")
+        self.driver.get(category_link + "?sorting=score")
         try:
             categories = WebDriverWait(self.driver, 1).until(
                 EC.presence_of_element_located((By.XPATH, "//div[@class='s2t']")))
@@ -172,7 +172,7 @@ class OzonParser:
         # iterates through all pages while button "Дальше" available
         self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 1000:
+        while next_button and items and len(links) < 800:
             try:
                 next_button = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-c3']")))
@@ -245,6 +245,19 @@ class OzonParser:
         ozon_id = ozon_id[len(ozon_id) - 2].split('-')
         ozon_id = ozon_id[len(ozon_id) - 1]
 
+        # extract subcategory
+        subcategory = ""
+        try:
+            subcategory = self.driver.find_element(By.XPATH, "//div[@data-widget='breadCrumbsPdp']").text
+            subcategory = subcategory.split('\n')[1]
+        except:
+            pass
+        try:
+            subcategory = self.driver.find_element(By.XPATH, "//div[@data-widget='breadCrumbs']").text
+            subcategory = subcategory.split('\n')[1]
+        except:
+            pass
+
         # extract name of the item
         name = self.driver.find_element(By.XPATH, "//div[@data-widget='webProductHeading']").text
         name = name.replace("\"", "").replace("\'", "")
@@ -271,7 +284,7 @@ class OzonParser:
         properties.update(
             [("Название", name), ("Количество отзывов", r_sum), ("Оценка", score), ("Описание", description),
              ("ozone_id", ozon_id),
-             ("Цена (руб.)", price), ("Ссылка", item_link)])
+             ("Цена (руб.)", price), ("Ссылка", item_link), ("Подкатегория", subcategory)])
         return properties
 
     def get_subcategory_items(self, subcategory_link):
@@ -291,8 +304,9 @@ class OzonParser:
                 print(n)
                 return
             except Exception as e:
-                print(e)
-                print(f"Exception while parsing item was caught:\n{item}")
+                pass
+                # print(e)
+                # print(f"Exception while parsing item was caught:\n{item}")
         return [name, subcategory, subcategory_link]
 
     def parse_category(self, link):
@@ -305,7 +319,7 @@ class OzonParser:
                 ParseTools.add_parsed_category(s)
             else:
                 print(
-                    f"The subcategory: {s} in category {link} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
+                    f"The category: {s} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
                     f"you want to update the data or to pass it?")
                 print("Enter 'Y' to update or any key to continue")
                 key = input()
@@ -319,23 +333,20 @@ class OzonParser:
     def parse_site(self):
         categories = self.get_category_links()
         for c in categories:
-            sub_links = self.get_subcategory_links(c)
-            for s in sub_links:
-                if not ParseTools.check_if_parsed(s):
-                    subcategory = self.get_subcategory_items(s)
+            if not ParseTools.check_if_parsed(c):
+                subcategory = self.get_subcategory_items(c)
+                ParseTools.json_backup(c, subcategory)
+                ParseTools.add_parsed_category(c)
+            else:
+                print(
+                    f"The category: {c} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
+                    f"you want to update the data or to pass it?")
+                print("Enter 'Y' to update or any key to continue")
+                key = input()
+                if key == 'y' or key == 'Y':
+                    subcategory = self.get_subcategory_items(c)
                     ParseTools.json_backup(c, subcategory)
-                    WriteToDatabase.write_to_db(subcategory)
-                    ParseTools.add_parsed_category(s)
-                else:
-                    print(
-                        f"The subcategory: {s} is already parsed at {time.ctime(os.path.getmtime('parsed_categories.txt'))}!\nDo "
-                        f"you want to update the data or to pass it?")
-                    print("Enter 'Y' to update or any key to continue")
-                    key = input()
-                    if key == 'y' or key == 'Y':
-                        subcategory = self.get_subcategory_items(s)
-                        ParseTools.json_backup(c, subcategory)
-                        WriteToDatabase.update_to_db(subcategory)
+                    WriteToDatabase.update_to_db(subcategory)
         print(f"Site was successfully parsed!")
         self.driver.quit()
 
