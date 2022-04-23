@@ -39,13 +39,13 @@ def main():
                         wb.parse_site()
                 else:
                     print("This site has not supported yet! Parser can process only 'Ozon' and 'Wildberries'.")
-            except (NoSuchWindowException, WebDriverException):
+            except NoSuchWindowException:
                 print("The parser window was closed!")
             print("Press any key to continue or press 'ESC' to exit: ")
             if keyboard.read_key() == 'esc':
                 break
         else:
-            print('Got invalid url. Please, type again...')
+            print('Got invalid url! Please, type again...')
     print("Stopping service...")
     exit(0)
 

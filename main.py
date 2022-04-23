@@ -2,6 +2,8 @@ import json
 import requests
 import os
 import time
+import validators
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
@@ -12,6 +14,7 @@ from db import WriteToDatabase
 
 
 class ParseTools:
+
     # auxiliary methods for parsing process optimization
     @staticmethod
     def add_parsed_category(link):
@@ -113,6 +116,11 @@ class ParseTools:
 
 
 class OzonParser:
+    MAIN_URL = 'https://www.ozon.ru'
+
+    headers = {
+        'accept': '* / *',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36'}
 
     def __init__(self):
         options = webdriver.ChromeOptions()
@@ -134,10 +142,11 @@ class OzonParser:
         :return: list of category links
         """
         try:
-            self.driver.get("https://www.ozon.ru/")
-            categories = WebDriverWait(self.driver, 1).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//a[@class='g3s e4c c5e']")))
-            category_links = [category.get_attribute('href') + "?sorting=score" for category in categories]
+            page = requests.get(self.MAIN_URL, headers=self.headers).text
+            bs = BeautifulSoup(page, 'lxml')
+            categories = bs.find("div", id="stickyHeader").findAll("a")
+            category_links = [self.MAIN_URL + category.get('href') + "?sorting=score" for category in categories]
+            category_links = [c for c in category_links if 'category' in c and validators.url(c)]
             return category_links
         except Exception as e:
             print(e)
@@ -167,23 +176,12 @@ class OzonParser:
         """
         links = []
         items = True
-        next_button = True
-        first_time = False
-        # iterates through all pages while button "Дальше" available
         self.driver.get(page_link)
         # take a restriction of 1000 for the number of products due to long time process
-        while next_button and items and len(links) < 800:
+        counter = 1
+        while items and len(links) < 800:
             try:
-                next_button = WebDriverWait(self.driver, 1).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[@class='ui-c3']")))
-                if len(next_button) > 1:
-                    next_button = next_button[1]
-                else:
-                    if self.driver.current_url == page_link and first_time:
-                        break
-                    next_button = next_button[0]
-                first_time = True
-                next_button.send_keys(Keys.PAGE_DOWN)
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 items = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_element_located((By.XPATH, "//div[@data-widget='searchResultsV2']")))
                 items = items.find_elements(By.TAG_NAME, 'a')
@@ -191,15 +189,10 @@ class OzonParser:
                 items = [_ for _ in items if 'comments--offset-80' not in _]
                 items = list(dict.fromkeys(items))
                 links.extend(items)
-                self.driver.get(next_button.get_attribute('href'))
+                counter+=1
+                link = page_link.replace('?sorting=score', '') + f'?page={counter}&sorting=score'
+                self.driver.get(link)
             except:
-                self.driver.execute_script(f"window.scrollTo(0, {1080})")
-                items = self.driver.find_element(By.XPATH, "//div[@data-widget='searchResultsV2']")
-                items = items.find_elements(By.TAG_NAME, 'a')
-                items = [_.get_attribute('href') for _ in items]
-                items = [_ for _ in items if 'comments--offset-80' not in _]
-                items = list(dict.fromkeys(items))
-                links.extend(items)
                 break
         return links
 
@@ -240,6 +233,7 @@ class OzonParser:
             if len(headers) == len(desc):
                 for i in range(len(headers)):
                     properties.update({headers[i].text.replace("\'", ""): desc[i].text.replace("\'", "")})
+
         # extract ozon_id
         ozon_id = item_link.split('/')
         ozon_id = ozon_id[len(ozon_id) - 2].split('-')
@@ -270,8 +264,9 @@ class OzonParser:
         r_sum = 0
         score = ""
         try:
-            self.driver.execute_script(f"window.scrollTo(0, {3 * 1080})")
-            score = self.driver.find_element(By.XPATH, "(//div[@data-widget='webReviewProductScore'])[3]").text
+            self.driver.execute_script(f"window.scrollTo(0, {4 * 1080})")
+            score = WebDriverWait(self.driver, 1).until(
+            EC.presence_of_element_located((By.XPATH, "(//div[@data-widget='webReviewProductScore'])[3]"))).text
             score = score.split("\n")
             for i in range(1, len(score) - 1, 2):
                 properties.update({score[i]: score[i + 1]})
